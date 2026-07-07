@@ -7,6 +7,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./middleware": {
+      "types": "./dist/middleware.d.ts",
+      "import": "./dist/middleware.js"
     }
   },
   "main": "./dist/index.js",
@@ -16,7 +20,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean --target node22",
+    "build": "tsup src/index.ts src/middleware.ts --format esm --dts --clean --target node22",
     "prepare": "pnpm run build",
     "test": "node --test --experimental-strip-types",
     "typecheck": "tsc --noEmit"
