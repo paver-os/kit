@@ -136,6 +136,22 @@ namespace.
 **Decision:** `#ContractsPackage` depends on no other `@paver/*` package. It exports only Zod schemas and their inferred types (satisfies AC-KIT-005.1, AC-KIT-005.4).
 
 **Consequences:** Any consumer can adopt the shared vocabulary in isolation, without pulling a Supabase or Shopify client it does not use — the lowest-friction path to a common data language, which is the prerequisite for the Phase-2 product connections. The cost is that cross-contract validation logic, if ever needed, must live in a separate consumer or a future package rather than inside contracts; keeping the leaf pure is worth more than that convenience.
+
+### ADR-006: `@supabase/ssr` and `supabase-js` are peer dependencies, not direct
+
+**Context:** Discovered during RACK adoption (@REQ-KIT-004). Cargo runs `@supabase/ssr` 0.5 and RACK runs 0.12. If `#SupabasePackage` declared these as direct dependencies pinned to one range, a consumer on the other range would install a second copy — and the `CookieMethodsServer` type from the package's copy would not be assignable to the consumer's copy, breaking type-checking at the boundary.
+
+**Decision:** `@supabase/ssr` and `@supabase/supabase-js` are `peerDependencies` (range `>=0.5` / `>=2.45`); the consumer owns the version. They remain `devDependencies` so the package still builds and tests in isolation. Because tsup leaves peers external, `dist` imports them unbundled and resolves to the consumer's single copy.
+
+**Consequences:** One copy of the Supabase SDK per consumer, no dual-version type clashes across the 0.5↔0.12 gap — verified: after adoption each of Cargo and RACK has exactly one `@supabase/ssr` on disk. The cost is that a consumer must have the SDKs installed (every Next app in the fleet already does); a hypothetical pure-Node consumer would add them explicitly.
+
+### ADR-007: the browser client reads env as static literals, not via a helper
+
+**Context:** Discovered during adoption. Next (and Turbopack/webpack DefinePlugin) inlines `NEXT_PUBLIC_*` into the client bundle **only** where it sees the exact static member expression `process.env.NEXT_PUBLIC_SUPABASE_URL`. `#SupabasePackage` originally read env through a shared `getSupabaseEnv()` helper using dynamic `process.env[key]` — which Next does not replace, so the value resolved to `undefined` in the browser and OAuth failed silently at click time. tsc and `next build` both pass; the failure is runtime-only. (Same defect RACK's own `client.ts` had documented from the Spairo incident, commit 78a477c.)
+
+**Decision:** `createBrowserClient()` references `process.env.NEXT_PUBLIC_SUPABASE_URL` / `...ANON_KEY` as static literals directly (with the newline guard applied to the inlined value). The server and admin factories keep using the dynamic env helper — server-side `process.env` is read at runtime and needs no inlining.
+
+**Consequences:** The public env is correctly inlined into the client bundle — verified end-to-end by building each consumer with a sentinel URL and grepping `.next/static` for it. The cost is a deliberate non-DRY: the two `NEXT_PUBLIC_*` names appear as literals in `browser.ts` and must not be refactored into a helper. This is a case where a compiler constraint outranks DRY, and the code comment says so.
 ```
 <!--
 Boris's notes:
