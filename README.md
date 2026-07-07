@@ -34,6 +34,31 @@ pnpm -r test         # AC-KIT-001.2
 
 Requires Node 22 + pnpm 9 (fleet is mid-migration off Node 20).
 
+## Consuming a package (private-repo auth)
+
+`paver-os/kit` is private, so a consumer must be able to reach it over git. Two
+gotchas, both verified 2026-07-06:
+
+1. **pnpm forces `github:` deps to SSH.** If the machine authenticates to GitHub
+   over an https token (not SSH keys), add a one-time git rewrite so SSH URLs
+   resolve over https:
+   ```bash
+   git config --global url."https://github.com/".insteadOf "git+ssh://git@github.com/"
+   git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+   ```
+   (Alternatively, add an SSH key to GitHub.)
+
+2. **Vercel builds** must be allowed to install the private dep. Grant the
+   Vercel project access to the `paver-os/kit` repo (GitHub integration) or
+   supply a git token in the build environment.
+
+Consumer dependency line (verified installable, prebuilt, no build step):
+```json
+"@paver/supabase": "github:paver-os/kit#supabase-v0.1.0"
+```
+The root export is `next`-free (works in a Node script); the SSR middleware
+helper is at `@paver/supabase/middleware`.
+
 ## Releasing a package
 
 npm/pnpm cannot install a *subdirectory* of a git repo as a package, so a plain
