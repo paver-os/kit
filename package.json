@@ -1,0 +1,38 @@
+{
+  "name": "@paver/supabase",
+  "version": "0.3.0",
+  "description": "Shared Supabase client factories (browser/server/admin) + env-newline guard + SSR middleware helper for the Paver fleet.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    },
+    "./middleware": {
+      "types": "./dist/middleware.d.ts",
+      "import": "./dist/middleware.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@supabase/ssr": ">=0.5.0",
+    "@supabase/supabase-js": ">=2.45.0",
+    "next": ">=15"
+  },
+  "peerDependenciesMeta": {
+    "next": {
+      "optional": true
+    }
+  }
+}
