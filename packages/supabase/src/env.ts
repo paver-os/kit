@@ -34,3 +34,15 @@ export function requireEnv(key: string): string {
   }
   return value;
 }
+
+/**
+ * Tolerant read of the public Supabase env (guarded). Never throws: `configured`
+ * is false until both values are present. Lets an app stay honest about whether
+ * a live connection exists (e.g. before provisioning) instead of crashing or
+ * fabricating one.
+ */
+export function getSupabaseEnv(): { url: string; anonKey: string; configured: boolean } {
+  const url = readEnv("NEXT_PUBLIC_SUPABASE_URL") ?? "";
+  const anonKey = readEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY") ?? "";
+  return { url, anonKey, configured: Boolean(url && anonKey) };
+}
