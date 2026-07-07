@@ -1,0 +1,32 @@
+{
+  "name": "@paver/contracts",
+  "version": "0.1.0",
+  "description": "Shared cross-product data contracts (Zod schemas + inferred types) for the Paver fleet: Brand, SKU, Order, Lead, PO.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean --target node22",
+    "prepare": "pnpm run build",
+    "test": "node --test --experimental-strip-types",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "zod": ">=3.23.0"
+  },
+  "devDependencies": {
+    "zod": "^3.23.8",
+    "tsup": "^8.3.0",
+    "typescript": "^5.9.2"
+  }
+}
