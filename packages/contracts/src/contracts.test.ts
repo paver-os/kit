@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   BrandSchema,
   SkuSchema,
+  AssetSchema,
   OrderSchema,
   LeadSchema,
   PoSchema,
@@ -61,4 +62,17 @@ test("PO: valid parses, bad status rejects", () => {
   };
   assert.doesNotThrow(() => PoSchema.parse(valid));
   assert.equal(PoSchema.safeParse({ ...valid, status: "paid" }).success, false);
+});
+
+test("Asset: valid parses, bad brand and bad status reject", () => {
+  const valid = {
+    id: "1a2b3c_drive_file",
+    brand: "M",
+    status: "Approved",
+    thumbnailUrl: "https://drive.example/thumb/1a2b3c",
+    originalUrl: "https://drive.example/file/1a2b3c",
+  };
+  assert.doesNotThrow(() => AssetSchema.parse(valid));
+  assert.equal(AssetSchema.safeParse({ ...valid, brand: "XX" }).success, false);
+  assert.equal(AssetSchema.safeParse({ ...valid, status: "Published" }).success, false);
 });

@@ -16,7 +16,7 @@ split clean.
 | Package | Status | Replaces |
 |---|---|---|
 | `@paver/supabase` | **published `v0.3.0`** (adopted by Cargo + RACK) | 5× hand-rolled `lib/supabase/*` client sets |
-| `@paver/contracts` | **published `v0.1.0`** | Zod shapes: Brand · SKU · Order · Lead · PO |
+| `@paver/contracts` | **published `v0.2.0`** | Zod shapes: Brand · SKU · Asset · Order · Lead · PO |
 | `@paver/auth-gate` | deferred (REQ-KIT-007) | 4× allowlist gate |
 | `@paver/ui` | deferred (REQ-KIT-007) | 4× shadcn/utils scaffold |
 | `@paver/shopify` | deferred (REQ-KIT-007) | 6–7× Shopify Admin client |

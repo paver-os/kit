@@ -17,6 +17,7 @@ export {
 } from "./primitives.ts";
 export { BrandSchema, type Brand } from "./brand.ts";
 export { SkuSchema, SkuStatusSchema, type Sku, type SkuStatus } from "./sku.ts";
+export { AssetSchema, AssetStatusSchema, type Asset, type AssetStatus } from "./asset.ts";
 export {
   OrderSchema,
   OrderLineSchema,

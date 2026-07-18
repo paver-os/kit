@@ -1,7 +1,7 @@
 {
   "name": "@paver/contracts",
-  "version": "0.1.0",
-  "description": "Shared cross-product data contracts (Zod schemas + inferred types) for the Paver fleet: Brand, SKU, Order, Lead, PO.",
+  "version": "0.2.0",
+  "description": "Shared cross-product data contracts (Zod schemas + inferred types) for the Paver fleet: Brand, SKU, Asset, Order, Lead, PO.",
   "type": "module",
   "exports": {
     ".": {
