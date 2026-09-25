@@ -7,9 +7,9 @@
 > **Revision:** 2 — 2026-09-25. Independent review of `packages/jev`. Re-cut in place: AC-KIT-015.1 (scan every string the request body carries, question keys included — Revision 1 said "the text of every question", which left keys unscanned) and AC-KIT-015.3 (separators widened; the exchange may begin with 0 or 1). Added: AC-KIT-014.15 (timeout holds when the transport ignores its signal), AC-KIT-015.18 through .21 (size before scan, linear scan, known fields only, 7-digit decision), AC-KIT-016.25 through .27 (full answer validation, null-shaped questions). No other AC changed meaning.
 > **Revision 1** — 2026-09-25.
 > **Traces up to:** operator direction, Tony Davis, 2026-09-25 (commissioned `@paver/jev` as the one way products call Jev) · `@artifact:paver/.claude/skills/jev/SKILL.md` (the fleet's usage, data and fallback rules for Jev) · the 2026-09-25 live verification and 49-message pilot recorded in the Measured Facts table below.
-> **Bootstrap mode:** **CLAIMED — requires Tony's explicit approval.** No Product Overview exists for Jev use, and no consumer has committed to adopting the package. `AC-KIT-007.1`'s pattern is that a package receives its Requirement when a first consumer commits; this FRD is authored ahead of that, on operator direction, because the data rule and the fallback rule must exist in code before the first product call rather than after it. Re-grade when a first consumer's Requirement cites this one.
+> **Bootstrap mode:** **APPROVED by Tony Davis, 2026-09-25** (in-session: "sign off the work order and start using Jev for Surf tagging" — option a). Surf asset tagging is named as the first consumer. No Product Overview exists for Jev use, and no consumer has committed to adopting the package. `AC-KIT-007.1`'s pattern is that a package receives its Requirement when a first consumer commits; this FRD is authored ahead of that, on operator direction, because the data rule and the fallback rule must exist in code before the first product call rather than after it. Re-grade when a first consumer's Requirement cites this one.
 > **Downstream:** `@blueprint:paver-jev-guarded-decision-client` · `WO-KIT-003`.
-> **Implemented in:** `packages/jev/` (`WO-KIT-003`, in progress).
+> **Implemented in:** `packages/jev/` (`WO-KIT-003`, done 2026-09-25; released `jev-v0.1.0`).
 
 ## Overview
 

@@ -2,7 +2,7 @@
 owner: builder
 blocks: []
 blocked-by: []
-open-blockers: [bootstrap-operator-approval-jev]
+open-blockers: []
 ---
 
 # WO-KIT-003: Build `@paver/jev` — the guarded Jev decision client
@@ -164,18 +164,18 @@ injected transport and clock, `types: []`), ADR-006 (no default threshold), ADR-
 
 Test-case names in `packages/jev/src/*.test.ts`; each test carries its AC ids in a comment above it.
 
-| COV | Covers | Tests |
-|---|---|---|
-| `COV_KIT_040` | AC-KIT-013.1–.12, .23–.27 — success path, endpoint, model, usage, cost-undefined-not-zero | `client.test.ts`: "success: …", "usage: …" (×2) |
-| `COV_KIT_041` | AC-KIT-013.2, .3, .5, .6, .8–.10, .20–.22, AC-KIT-016.14, .15 — failure kinds, no rejection | `client.test.ts`: "auth: …" (×2), "rejected: …" (×2), "bad_response: …" (×4), "answers: …", "network: …" |
-| `COV_KIT_042` | AC-KIT-014.1–.13 — retry, jitter, Retry-After (both forms), budget, attempt timeout | `client.test.ts`: "retry: …" (×8), "timeout: …" (×3) |
-| `COV_KIT_043` | AC-KIT-013.14–.19 — default fetch, key at call time, newline guard, missing key, key never in a failure, no console | `client.test.ts`: "transport: …", "key: …" (×3), "console: …" |
-| `COV_KIT_044` | AC-KIT-015.1–.10, .12–.14 — personal-data scan, refusal, opt-in, non-flagged dates and timestamps | `guards.test.ts`: "personal data: …" (×7); `client.test.ts`: "personal data: …" (×3) |
-| `COV_KIT_045` | AC-KIT-015.15–.17, AC-KIT-016.9–.11 — size refusals, invalid requests, all unsent | `client.test.ts`: "size: …" (×2), "invalid_request: …"; `guards.test.ts`: "size: …" |
-| `COV_KIT_046` | AC-KIT-016.1–.8, .16–.24 — builders, decide, decideChoice, no default threshold | `guards.test.ts`: "builders: …" (×4), "decide: …" (×4), "decideChoice: …" |
-| `COV_KIT_047` | AC-KIT-013.4, AC-KIT-016.12, .13 — compile-time result and answer typing | `src/result-type.typecheck.ts` via `pnpm -r exec tsc --noEmit` (`@ts-expect-error` lines fail the gate if the types loosen) |
-| `COV_KIT_048` | AC-KIT-013.13, .28, .29 — zero runtime deps; smoke makes one call, only when `JEV_LIVE=1` | `package.test.ts` (×3) |
-| `COV_KIT_049` | Revision 2 — AC-KIT-015.1, .2, .3, .18–.21; AC-KIT-016.25–.27; AC-KIT-014.13, .15; AC-KIT-013.2, .18 — size before scan, linear scan, keys scanned, known fields only, phone forms, 7-digit decision, full answer validation, null-shaped questions, deaf fetch, throwing clock, short key, every timing default | `hardening.test.ts` (×23) |
+- **COV_KIT_040** — covers AC-KIT-013.1, AC-KIT-013.2, AC-KIT-013.3, AC-KIT-013.4, AC-KIT-013.5, AC-KIT-013.6, AC-KIT-013.7, AC-KIT-013.8, AC-KIT-013.9, AC-KIT-013.10, AC-KIT-013.11, AC-KIT-013.12, AC-KIT-013.23, AC-KIT-013.24, AC-KIT-013.25, AC-KIT-013.26, AC-KIT-013.27 — success path, endpoint, model, usage, cost-undefined-not-zero. Tests: `client.test.ts`: "success: …", "usage: …" (×2)
+- **COV_KIT_041** — covers AC-KIT-013.2, AC-KIT-013.3, AC-KIT-013.5, AC-KIT-013.6, AC-KIT-013.8, AC-KIT-013.9, AC-KIT-013.10, AC-KIT-013.20, AC-KIT-013.21, AC-KIT-013.22, AC-KIT-016.14, AC-KIT-016.15 — failure kinds, no rejection. Tests: `client.test.ts`: "auth: …" (×2), "rejected: …" (×2), "bad_response: …" (×4), "answers: …", "network: …"
+- **COV_KIT_042** — covers AC-KIT-014.1, AC-KIT-014.2, AC-KIT-014.3, AC-KIT-014.4, AC-KIT-014.5, AC-KIT-014.6, AC-KIT-014.7, AC-KIT-014.8, AC-KIT-014.9, AC-KIT-014.10, AC-KIT-014.11, AC-KIT-014.12, AC-KIT-014.13 — retry, jitter, Retry-After (both forms), budget, attempt timeout. Tests: `client.test.ts`: "retry: …" (×8), "timeout: …" (×3)
+- **COV_KIT_043** — covers AC-KIT-013.14, AC-KIT-013.15, AC-KIT-013.16, AC-KIT-013.17, AC-KIT-013.18, AC-KIT-013.19 — default fetch, key at call time, newline guard, missing key, key never in a failure, no console. Tests: `client.test.ts`: "transport: …", "key: …" (×3), "console: …"
+- **COV_KIT_044** — covers AC-KIT-015.1, AC-KIT-015.2, AC-KIT-015.3, AC-KIT-015.4, AC-KIT-015.5, AC-KIT-015.6, AC-KIT-015.7, AC-KIT-015.8, AC-KIT-015.9, AC-KIT-015.10, AC-KIT-015.12, AC-KIT-015.13, AC-KIT-015.14 — personal-data scan, refusal, opt-in, non-flagged dates and timestamps. Tests: `guards.test.ts`: "personal data: …" (×7); `client.test.ts`: "personal data: …" (×3)
+- **COV_KIT_045** — covers AC-KIT-015.15, AC-KIT-015.16, AC-KIT-015.17, AC-KIT-016.9, AC-KIT-016.10, AC-KIT-016.11 — size refusals, invalid requests, all unsent. Tests: `client.test.ts`: "size: …" (×2), "invalid_request: …"; `guards.test.ts`: "size: …"
+- **COV_KIT_046** — covers AC-KIT-016.1, AC-KIT-016.2, AC-KIT-016.3, AC-KIT-016.4, AC-KIT-016.5, AC-KIT-016.6, AC-KIT-016.7, AC-KIT-016.8, AC-KIT-016.16, AC-KIT-016.17, AC-KIT-016.18, AC-KIT-016.19, AC-KIT-016.20, AC-KIT-016.21, AC-KIT-016.22, AC-KIT-016.23, AC-KIT-016.24 — builders, decide, decideChoice, no default threshold. Tests: `guards.test.ts`: "builders: …" (×4), "decide: …" (×4), "decideChoice: …"
+- **COV_KIT_047** — covers AC-KIT-013.4, AC-KIT-016.12, AC-KIT-016.13 — compile-time result and answer typing. Tests: `src/result-type.typecheck.ts` via `pnpm -r exec tsc --noEmit` (`@ts-expect-error` lines fail the gate if the types loosen)
+- **COV_KIT_048** — covers AC-KIT-013.13, AC-KIT-013.28, AC-KIT-013.29 — zero runtime deps; smoke makes one call, only when `JEV_LIVE=1`. Tests: `package.test.ts` (×3)
+- **COV_KIT_049** — covers Revision 2 — AC-KIT-015.1, AC-KIT-015.2, AC-KIT-015.3, AC-KIT-015.18, AC-KIT-015.19, AC-KIT-015.20, AC-KIT-015.21, AC-KIT-016.25, AC-KIT-016.26, AC-KIT-016.27, AC-KIT-014.13, AC-KIT-014.15, AC-KIT-013.2, AC-KIT-013.18 — size before scan, linear scan, keys scanned, known fields only, phone forms, 7-digit decision, full answer validation, null-shaped questions, deaf fetch, throwing clock, short key, every timing default. Tests: `hardening.test.ts` (×23)
+- **COV_KIT_050** — covers AC-KIT-014.14 — every AC-KIT-014.13 default is overridden at client creation in the suite (`maxAttempts`, `attemptTimeoutMs`, `totalBudgetMs` in `hardening.test.ts`; `baseDelayMs`, `maxDelayMs`, `attemptTimeoutMs`, `maxAttempts` in `client.test.ts`) and the overridden value is what the assertion observes.
+- **COV_KIT_051** — covers AC-KIT-015.11 — policy check, not a unit test: `grep -rln allowPersonalData` over every `projects/*/` `.ts`/`.tsx` outside kit returns no file (main thread, 2026-09-25). Re-run at each consumer's Work Order.
 
 Revision 2 mutations, 2026-09-25, each red then restored byte-identical (`cmp`): restoring the
 backtracking email regex reds the 30,000-char scan-time test; moving the size check after the scan
@@ -191,7 +191,6 @@ restored byte-identical after each (verified with `cmp`).
 ## Verification
 
 | Signal | Command (kit root, Node 22, pnpm 9) | Pass condition |
-|---|---|---|
 | Install | `pnpm install --frozen-lockfile` | exits 0 with the updated lockfile |
 | Build | `pnpm -r build` | exits 0; `packages/jev/dist/index.js` + `index.d.ts`, no imports in the bundle |
 | Types | `pnpm -r exec tsc --noEmit` | exits 0, including `result-type.typecheck.ts` |
@@ -211,7 +210,7 @@ restored byte-identical after each (verified with `cmp`).
 
 ## Notes
 
-- The live smoke has **not** been run by this Work Order's builder. Its skip path was run once
+- The main thread ran the live smoke on 2026-09-25: `ok: true`, 1 attempt, 856 ms. Before that, the builder had not run it. Its skip path was run once
   (no `JEV_LIVE`): it printed the skip line, exited 0, and made no call.
 - Node's test runner treats any file named `test-*` as a test file; the harness is named
   `fixtures.ts` so the reported test count equals the tests written.
@@ -225,3 +224,4 @@ restored byte-identical after each (verified with `cmp`).
   test-first; gates green in the builder's run.
 - 2026-09-25 — independent review found 5 defects plus minors; fixed test-first against FRD
   Revision 2 and Blueprint Revision 2; gates green, 78 tests run of 78 written.
+- 2026-09-25 — main thread re-ran gates (78/78 jev, 5/5 supabase, 6/6 contracts; build + tsc exit 0) and the live smoke (ok, 1 attempt); released `jev-v0.1.0` (tag pushed). Tony approved the bootstrap claim (recorded in the FRD header); blocker `bootstrap-operator-approval-jev` closed; moved to `done/`.
