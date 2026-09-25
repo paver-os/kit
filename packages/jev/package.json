@@ -1,6 +1,6 @@
 {
   "name": "@paver/jev",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Guarded client for TypeSafe AI's Jev (System One) via Vercel AI Gateway: typed questions and answers, never-throw typed failures, bounded retry, personal-data and size refusals, yes/no/unsure decisions.",
   "type": "module",
   "exports": {
@@ -13,7 +13,7 @@
   "types": "./dist/index.d.ts",
   "files": ["dist"],
   "engines": {
-    "node": ">=22"
+    "node": ">=20"
   },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean --target node22",

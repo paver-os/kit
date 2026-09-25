@@ -4,7 +4,7 @@ Guarded client for TypeSafe AI's **Jev** ("System One") through Vercel AI Gatewa
 
 - **Requirement:** `@REQ-KIT-013` … `@REQ-KIT-016` (`.paver/requirements/frds/REQ-KIT-013-paver-jev-guarded-decision-client.md`)
 - **Blueprint:** `@blueprint:paver-jev-guarded-decision-client`
-- **Runtime:** Node 22+, or any runtime with global `fetch`. Zero runtime dependencies.
+- **Runtime:** Node 20+ (built package verified on 20.19.2, incl. a live call, 2026-09-25), or any runtime with global `fetch`. Tests and the smoke script need Node 22 (`--experimental-strip-types`). Zero runtime dependencies.
 
 ```json
 "@paver/jev": "github:paver-os/kit#jev-v0.1.0"
