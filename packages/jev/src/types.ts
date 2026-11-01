@@ -1,7 +1,9 @@
 /**
- * Wire and result types for Jev's System One endpoint. Question shapes are the
- * exact JSON the gateway accepts (verified live 2026-09-25), so a built
- * question is sent as-is. Traces to @REQ-KIT-013 and @REQ-KIT-016.
+ * Caller-facing question, answer and result types. Since v0.2.0 the wire is
+ * the gateway's OpenAI-compatible `/v1/decisions` (verified live 2026-10-31);
+ * these caller shapes are unchanged from v0.1 and the client translates them
+ * to and from that wire (#DecisionsWire). Traces to @REQ-KIT-013, @REQ-KIT-016
+ * and @REQ-KIT-017.
  */
 
 /** Structural subset of `fetch` the client needs; injectable for tests (AC-KIT-013.14). */
@@ -53,12 +55,22 @@ export interface ScoreAnswer {
   legend?: Record<string, string>;
 }
 
+/**
+ * Jev declined this one question (wire `{"type":"refusal"}`); the other
+ * questions in the call are answered normally (AC-KIT-017.14). It is part of
+ * every answer's union so the type checker makes a caller handle it.
+ */
+export interface RefusedAnswer {
+  type: "refusal";
+  refused: true;
+}
+
 export type AnswerFor<Q> = Q extends NoulQuestion
-  ? NoulAnswer
+  ? NoulAnswer | RefusedAnswer
   : Q extends ChoiceQuestion<infer K>
-    ? ChoiceAnswer<K>
+    ? ChoiceAnswer<K> | RefusedAnswer
     : Q extends ScoreQuestion
-      ? ScoreAnswer
+      ? ScoreAnswer | RefusedAnswer
       : never;
 
 export type JevAnswers<Qs extends JevQuestions> = { [P in keyof Qs]: AnswerFor<Qs[P]> };
@@ -72,6 +84,8 @@ export interface JevUsage {
   cost?: number;
   /** Market-rate price in USD. Undefined when the response carried none. */
   marketCost?: number;
+  /** The upstream provider that answered (`routing.finalProvider`). Undefined when not reported. */
+  provider?: string;
 }
 
 export type PersonalDataKind = "email" | "phone" | "ssn" | "card";
@@ -83,6 +97,7 @@ export type JevFailureKind =
   | "missing_key"
   | "auth"
   | "rejected"
+  | "no_zdr_provider"
   | "exhausted"
   | "bad_response";
 
@@ -94,7 +109,7 @@ export interface JevFailure {
   message: string;
   /** Whether any attempt left the process (AC-KIT-013.6). */
   sent: boolean;
-  /** HTTP status, on `auth`, `rejected`, and `exhausted` when the last outcome was a response. */
+  /** HTTP status, on `auth`, `rejected`, `no_zdr_provider`, and `exhausted` when the last outcome was a response. */
   status?: number;
   /** On `exhausted`: the last retryable outcome (AC-KIT-014.12). */
   lastOutcome?: RetryableOutcome;
@@ -111,7 +126,22 @@ export type JevResult<Qs extends JevQuestions> =
 
 // ── Client ───────────────────────────────────────────────────────────────────
 
+// ── Images (@REQ-KIT-017) ────────────────────────────────────────────────────
+
+export type JevImageMediaType = "image/jpeg" | "image/png" | "image/webp" | "image/gif";
+export type JevImageDetail = "low" | "high" | "auto";
+
+export interface JevImage {
+  /** Raw bytes, or base64 WITHOUT a `data:` prefix. Sent as a base64 data URL; external URLs are not supported. */
+  data: Uint8Array | string;
+  mediaType: JevImageMediaType;
+  /** Default `low` (~1,060 input tokens for a 512 px JPEG, measured 2026-10-31). */
+  detail?: JevImageDetail;
+}
+
 export interface JevClientConfig {
+  /** Decision model id. Default `JEV_MODEL` (`typesafe-ai/jev-1.14.0`). Zero data retention is required whatever the model. */
+  model?: string;
   /** Gateway key. When omitted, read from `AI_GATEWAY_API_KEY` at call time (AC-KIT-013.15). */
   apiKey?: string;
   /** Transport. Defaults to the global `fetch` (AC-KIT-013.14). */
@@ -138,6 +168,12 @@ export interface AskOptions {
    * until TypeSafe and the gateway offer zero data retention for Jev.
    */
   allowPersonalData?: true;
+  /**
+   * Images asked about together with the state (AC-KIT-017.6). They cannot be
+   * scanned for personal data; they are allowed because every call requires
+   * zero data retention (AC-KIT-017.3). At most 128, each at most 5 MB decoded.
+   */
+  images?: readonly JevImage[];
 }
 
 export interface JevClient {

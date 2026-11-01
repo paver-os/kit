@@ -4,12 +4,13 @@
 > **ID Prefix:** KIT
 > **Status:** Draft
 > **Owner:** Tony Davis (operator) · Karl Strunk (Author)
-> **Revision:** 2 — 2026-09-25. Independent review of `packages/jev`. Re-cut in place: AC-KIT-015.1 (scan every string the request body carries, question keys included — Revision 1 said "the text of every question", which left keys unscanned) and AC-KIT-015.3 (separators widened; the exchange may begin with 0 or 1). Added: AC-KIT-014.15 (timeout holds when the transport ignores its signal), AC-KIT-015.18 through .21 (size before scan, linear scan, known fields only, 7-digit decision), AC-KIT-016.25 through .27 (full answer validation, null-shaped questions). No other AC changed meaning.
+> **Revision:** 3 — 2026-10-31. TypeSafe released Jev 1.14.0 (gateway id `typesafe-ai/jev-1.14.0`, released 2026-10-14), which accepts images and lists `zdr: all`. Added **REQ-KIT-017** (AC-KIT-017.1 – .19): the `/v1/decisions` wire, the versioned model, zero data retention required on every call, image input and its guards, refusal answers, provider reporting. Re-cut in place to match: AC-KIT-013.11 and .12 (endpoint and model now name REQ-KIT-017), AC-KIT-015.20 (the wire's known fields), AC-KIT-016.10 (an image-only call may carry an empty state); the failure-kind set gains `no_zdr_provider`. AC-KIT-015.11 is unchanged — see the 2026-10-31 note under it.
+> **Revision 2** — 2026-09-25. Independent review of `packages/jev`. Re-cut in place: AC-KIT-015.1 (scan every string the request body carries, question keys included — Revision 1 said "the text of every question", which left keys unscanned) and AC-KIT-015.3 (separators widened; the exchange may begin with 0 or 1). Added: AC-KIT-014.15 (timeout holds when the transport ignores its signal), AC-KIT-015.18 through .21 (size before scan, linear scan, known fields only, 7-digit decision), AC-KIT-016.25 through .27 (full answer validation, null-shaped questions). No other AC changed meaning.
 > **Revision 1** — 2026-09-25.
 > **Traces up to:** operator direction, Tony Davis, 2026-09-25 (commissioned `@paver/jev` as the one way products call Jev) · `@artifact:paver/.claude/skills/jev/SKILL.md` (the fleet's usage, data and fallback rules for Jev) · the 2026-09-25 live verification and 49-message pilot recorded in the Measured Facts table below.
 > **Bootstrap mode:** **APPROVED by Tony Davis, 2026-09-25** (in-session: "sign off the work order and start using Jev for Surf tagging" — option a). Surf asset tagging is named as the first consumer. No Product Overview exists for Jev use, and no consumer has committed to adopting the package. `AC-KIT-007.1`'s pattern is that a package receives its Requirement when a first consumer commits; this FRD is authored ahead of that, on operator direction, because the data rule and the fallback rule must exist in code before the first product call rather than after it. Re-grade when a first consumer's Requirement cites this one.
-> **Downstream:** `@blueprint:paver-jev-guarded-decision-client` · `WO-KIT-003`.
-> **Implemented in:** `packages/jev/` (`WO-KIT-003`, done 2026-09-25; released `jev-v0.1.0`).
+> **Downstream:** `@blueprint:paver-jev-guarded-decision-client` · `WO-KIT-003` · `WO-KIT-004` (REQ-KIT-017).
+> **Implemented in:** `packages/jev/` (`WO-KIT-003`, done 2026-09-25; released `jev-v0.1.0`) · REQ-KIT-017 in `WO-KIT-004`, done 2026-10-31; released `jev-v0.2.0`.
 
 ## Overview
 
@@ -35,6 +36,11 @@ After this FRD ships: a product adds one pinned dependency, builds its questions
 | Reliability | 50 calls: 32 retries, 1 failure after 6 attempts; 429 and 503 observed | Live run |
 | Latency when served | median 0.38 s, max 0.62 s | Live run |
 | Data retention | gateway lists zero-data-retention = none, no-training = all | Gateway model listing |
+| Endpoint (since Revision 3) | `POST https://ai-gateway.vercel.sh/v1/decisions` (OpenAI-compatible); questions are a named array of `predicate` / `choice` / `score` | Live call, 2026-10-31 |
+| Versioned model | `typesafe-ai/jev-1.14.0` (released 2026-10-14): accepts images, gateway lists `zdr: all`; plain `typesafe-ai/jev` lists `zdr: some`, text-only | Gateway model listing + live call, 2026-10-31 |
+| ZDR enforcement | `providerOptions.gateway.zeroDataRetention: true` routed to `typesafe-ai` ("all 1 attempts support ZDR"); with no ZDR provider the gateway returns `400` `no_providers_available` | Live call + gateway docs, 2026-10-31 |
+| Images | base64 data URLs only, at most 128 per request, detail `low` / `high` / `auto` / `original`; a 512 px JPEG at `low` ≈ 1,060 input tokens ≈ $0.000045 | Live calls + gateway docs, 2026-10-31 |
+| Refusal | a declined question comes back `{"type":"refusal","name":…}` in its position; the others are answered | Gateway docs, 2026-10-31 — not observed live |
 | Pilot accuracy | 49 synthetic tickets: intent choice 48/49; "upset" noul 12/12 caught, 5 false positives at 0.5, 0 errors at 0.75 | Pilot run |
 
 ## Terminology
@@ -48,7 +54,9 @@ After this FRD ships: a product adds one pinned dependency, builds its questions
 - **Call** — one invocation of the package's ask function. A call makes one or more **attempts**.
 - **Attempt** — one HTTP request to the gateway.
 - **Result** — the value a call resolves to: a **success** carrying answers and usage, or a **failure** carrying a failure kind.
-- **Failure kind** — one value from the closed set `personal_data`, `state_too_large`, `invalid_request`, `missing_key`, `auth`, `rejected`, `exhausted`, `bad_response`.
+- **Failure kind** — one value from the closed set `personal_data`, `state_too_large`, `invalid_request`, `missing_key`, `auth`, `rejected`, `no_zdr_provider`, `exhausted`, `bad_response`.
+- **Image** — a JPEG, PNG, WebP or GIF the caller attaches to a call, given as bytes or as base64 without a `data:` prefix.
+- **Refused answer** — the answer for a question Jev declined: `{ type: "refusal", refused: true }`.
 - **Refusal** — a failure the package returns before any attempt is made.
 - **Retryable outcome** — an attempt that ends in HTTP status 429, 500, 502, 503 or 504, in the attempt timeout, or in the transport rejecting.
 - **Attempt timeout** — the longest the package waits for one attempt's response before aborting it.
@@ -85,8 +93,8 @@ After this FRD ships: a product adds one pinned dependency, builds its questions
 
 *The endpoint and the transport*
 
-- **AC-KIT-013.11:** The package shall send every attempt as a `POST` to `https://ai-gateway.vercel.sh/typesafe/v1/systemone`.
-- **AC-KIT-013.12:** The package shall send every attempt with the model id `typesafe-ai/jev`.
+- **AC-KIT-013.11:** The package shall send every attempt as a `POST` to the endpoint named in AC-KIT-017.1. *(Revision 3; was `…/typesafe/v1/systemone`.)*
+- **AC-KIT-013.12:** The package shall send every attempt with the model id named in AC-KIT-017.2. *(Revision 3; was `typesafe-ai/jev`.)*
 - **AC-KIT-013.13:** The package shall declare no runtime dependency.
 - **AC-KIT-013.14:** The package shall accept a caller-supplied fetch function and shall use the global `fetch` when none is supplied.
 
@@ -158,12 +166,13 @@ After this FRD ships: a product adds one pinned dependency, builds its questions
 - **AC-KIT-015.9:** A `personal_data` failure shall not contain the matched text.
 - **AC-KIT-015.10:** When the opt-in is set, the package shall send the call without the personal-data refusal.
 - **AC-KIT-015.11:** No consumer source file shall set the opt-in while the gateway lists Jev without zero data retention.
+  - *Recorded 2026-10-31, no change to this AC or to the guard's default:* the versioned model `typesafe-ai/jev-1.14.0` lists `zdr: all`, and since Revision 3 every call requires zero data retention (AC-KIT-017.3), measured live 2026-10-31. Whether that lifts this AC is an operator decision (Open Question 1); until Tony records it here, the opt-in stays forbidden and the personal-data refusal stays on by default.
 - **AC-KIT-015.12:** The package shall export its personal-data scan as a function a caller can run without making a call.
 - **AC-KIT-015.13:** The scan shall not flag an ISO 8601 date.
 - **AC-KIT-015.14:** The scan shall not flag a 10-digit Unix timestamp that begins with `1`.
 - **AC-KIT-015.18:** The package shall run the size check of AC-KIT-015.15 and AC-KIT-015.16 before the personal-data scan.
 - **AC-KIT-015.19:** The personal-data scan of a 30,000-character state shall complete in under 100 ms.
-- **AC-KIT-015.20:** The package shall send only the `type`, `instructions` and `criteria` fields of each question.
+- **AC-KIT-015.20:** The package shall send only the fields of each question named in AC-KIT-017.18 (`type`, `name`, `instructions`, and `choices` or `levels`). *(Revision 3; was `type`, `instructions`, `criteria`.)*
 - **AC-KIT-015.21:** The scan shall not flag a 7-digit local number of the form `NNN-NNNN`.
 
 *Size*
@@ -189,7 +198,7 @@ After this FRD ships: a product adds one pinned dependency, builds its questions
 - **AC-KIT-016.7:** When the `score` builder receives more than 10 levels, it shall throw a `RangeError`.
 - **AC-KIT-016.8:** When any builder receives empty instructions, it shall throw a `RangeError`.
 - **AC-KIT-016.9:** When a call carries a question that violates AC-KIT-016.4 through AC-KIT-016.8, the call shall resolve to an `invalid_request` failure with `sent` false.
-- **AC-KIT-016.10:** When a call carries an empty state, the call shall resolve to an `invalid_request` failure with `sent` false.
+- **AC-KIT-016.10:** When a call carries an empty state and no image, the call shall resolve to an `invalid_request` failure with `sent` false. *(Revision 3 added "and no image".)*
 - **AC-KIT-016.11:** When a call carries no questions, the call shall resolve to an `invalid_request` failure with `sent` false.
 
 *Answers*
@@ -214,6 +223,40 @@ After this FRD ships: a product adds one pinned dependency, builds its questions
 - **AC-KIT-016.26:** When a `score` answer's value lies outside 0 to the number of levels minus 1, lacks a probabilities map, carries a confidence outside 0 to 1, or carries a probability outside 0 to 1 or for a level that does not exist, the call shall resolve to a `bad_response` failure.
 - **AC-KIT-016.27:** When a question, its criteria, or its options are null or not objects of the expected shape, the call shall resolve to an `invalid_request` failure with `sent` false.
 
+### REQ-KIT-017: Calls use the versioned Jev with zero data retention, and may carry images
+
+**User Story:** As a product engineer who needs to label photos — product, person, shot quality — I want to ask Jev typed questions about images through the same guarded client, on a model that guarantees zero data retention on every call, so that I can identify images cheaply without hand-rolling a gateway call or reasoning about retention myself.
+
+**Acceptance Criteria:**
+
+*Endpoint, model, retention*
+
+- **AC-KIT-017.1:** The package shall send every attempt as a `POST` to `https://ai-gateway.vercel.sh/v1/decisions`.
+- **AC-KIT-017.2:** The package shall send the model id `typesafe-ai/jev-1.14.0` unless the caller sets a `model` when creating the client, in which case it shall send that id.
+- **AC-KIT-017.3:** Every attempt's body shall carry `providerOptions.gateway.zeroDataRetention` set to `true`.
+- **AC-KIT-017.4:** No client configuration value and no call option shall remove or change the field named in AC-KIT-017.3.
+- **AC-KIT-017.5:** When an attempt returns status 400 with error type `no_providers_available`, the call shall resolve to a `no_zdr_provider` failure carrying the status, with `sent` true, after that one attempt.
+
+*Images*
+
+- **AC-KIT-017.6:** The ask function shall accept an optional list of images. A call with no image shall send the state as a plain-string `input`; a call with one or more images shall send one user message whose parts are the state as `input_text` (omitted when the state is empty) followed by each image as `input_image`, in the caller's order.
+- **AC-KIT-017.7:** The package shall send each image as `data:<media type>;base64,<data>` with the caller's detail, or `low` when the caller gives none.
+- **AC-KIT-017.8:** When a call carries more than 128 images, the call shall resolve to an `invalid_request` failure with `sent` false.
+- **AC-KIT-017.9:** When an image's media type is not `image/jpeg`, `image/png`, `image/webp` or `image/gif`, or its detail is not `low`, `high` or `auto`, the call shall resolve to an `invalid_request` failure with `sent` false.
+- **AC-KIT-017.10:** When an image is empty, exceeds 5 MB (5,242,880 bytes) decoded, or its string data is not bare base64 (a `data:` prefix, a URL or a non-base64 character), the call shall resolve to an `invalid_request` failure with `sent` false.
+- **AC-KIT-017.11:** The size check of AC-KIT-015.15 and AC-KIT-015.16 shall count each image as part of the state: 1,100 estimated tokens at detail `low`, and 4,400 at `high` or `auto`.
+- **AC-KIT-017.12:** When a call carries images, the personal-data scan of AC-KIT-015.1 shall still run over the state and every question string.
+- **AC-KIT-017.13:** The package shall not run the personal-data scan over image data.
+
+*Answers*
+
+- **AC-KIT-017.14:** When the response answers a question with type `refusal`, the success result shall carry `{ type: "refusal", refused: true }` under that question's key and the other questions' answers unchanged.
+- **AC-KIT-017.15:** The package shall match each answer to its question by the answer's `name`; when no answer carries a question's name, the call shall resolve to a `bad_response` failure.
+- **AC-KIT-017.16:** `decide` and `decideChoice` shall return `"unsure"` for a refused answer, and `decide` shall accept a noul answer as well as a bare probability.
+- **AC-KIT-017.17:** When the response carries `provider_metadata.gateway.routing.finalProvider`, a success result's usage shall report it as `provider`; otherwise `provider` shall be undefined.
+- **AC-KIT-017.18:** The package shall send a noul question as `predicate` with its true and false criteria appended to its instructions, a choice question as `choice` with `choices: [{ value, description }]`, and a score question as `score` with `levels: [{ label }]`, as an array named by the caller's keys; and it shall return answers in the shapes of REQ-KIT-016 (a choice's probabilities keyed by option, a score's keyed by level index).
+- **AC-KIT-017.19:** Each answer's type shall be a union with the refused answer, so that a TypeScript caller cannot read an answer's value without first ruling the refusal out.
+
 ## Scope Boundary
 
 **In scope:** one client for Jev's System One endpoint through Vercel AI Gateway; the typed failure contract; retry, backoff and budget; the personal-data and size refusals; typed question builders and answers; the yes / no / unsure decision helpers; usage and cost reporting per call; one opt-in live smoke script.
@@ -225,6 +268,8 @@ After this FRD ships: a product adds one pinned dependency, builds its questions
 | Choosing thresholds for any real question | Question-specific and data-specific. The pilot showed 0.5 is wrong for "upset" and 0.75 is right; that is a fact about one question. Each consumer labels its own sample. |
 | Detecting names, street addresses and free-text personal details | No pattern does this reliably. The policy (AC-KIT-015.11 and the skill's data rule) forbids personal text wholesale; the guard catches the patterns a regex can see and says so. |
 | Calling Jev over `/v1/responses` or through the AI SDK | Measured: that path returns 400 for this model. |
+| Image URLs, file ids, detail `original`, and image resizing | The gateway accepts only base64 data URLs; `original` has no measured token cost; resizing is the caller's job (a 512 px JPEG at `low` is the measured case). |
+| Scanning images for personal data | No pattern can read pixels. Images are allowed because zero data retention is required on every call (AC-KIT-017.3), not because they are known to be clean. |
 | A response cache, request batching across calls, or a circuit breaker | No consumer has asked. Each is a Requirement when one does. |
 | Budget and spend alerts | The gateway key carries its own monthly cap (`paver-jev`, $10). When the cap is hit, calls fail and callers take their fallback. |
 | Direct TypeSafe API access | TypeSafe paused direct sign-ups on 2026-09-22; the gateway is the only route in hand. |
@@ -236,11 +281,12 @@ After this FRD ships: a product adds one pinned dependency, builds its questions
 - **A 7-digit local number is not detected (AC-KIT-015.21).** `555-1234` is indistinguishable from part numbers, invoice numbers and ranges; flagging it would refuse ordinary catalog text. The policy, not the pattern, covers it.
 - **The phone pattern will refuse some non-personal numbers.** A bare 10-digit SKU or order number in North American phone shape is refused. That is the safe direction; the opt-in is not the remedy, because it is forbidden by policy. The remedy is trimming the state to the part the question needs.
 - **Retry-After can exceed the budget.** A gateway that asks for a 30-second wait inside an 8-second budget ends the call at once as `exhausted` (AC-KIT-014.8). That is intended: the caller's budget outranks the gateway's request.
+- **The image token estimate is anchored on one measurement.** 1,100 per `low` image comes from a 512 px JPEG (1,063–1,120 input tokens with short text, 2026-10-31); `high` and `auto` are unmeasured and set 4× higher. A call near the limit may be refused that Jev would accept — the safe direction.
 - **Routing can resolve to more than one upstream provider.** A 2026-09-25 response listed `digitalocean` and `typesafe-ai`. Data-retention guarantees must be checked across the whole route before AC-KIT-015.11 is lifted.
 
 ## Open Questions
 
-1. **When is AC-KIT-015.11 lifted?** When TypeSafe and the gateway both list zero data retention for every provider on Jev's route. Lifting it is an operator decision recorded in this FRD with the date and source; it is not a code change in the package.
+1. **When is AC-KIT-015.11 lifted?** When TypeSafe and the gateway both list zero data retention for every provider on Jev's route. Lifting it is an operator decision recorded in this FRD with the date and source; it is not a code change in the package. *2026-10-31:* `typesafe-ai/jev-1.14.0` lists `zdr: all` and every call now requires it (AC-KIT-017.3); the decision is still open.
 2. **Who is the first consumer?** None has committed. The bootstrap claim above closes when one does.
 
 <!--
@@ -263,6 +309,10 @@ REVISION 2 — AC-KIT-016.25 and .26 each list several conditions joined by "or"
   claim each ("a structurally invalid answer of this type is bad_response"), each condition has its
   own test, and splitting them into eight ACs would add ids without adding a test. Flagged for
   Karl's next drift review; split if he disagrees.
+
+REVISION 3 — REQ-KIT-017 was the next free id (grepped .paver/ for REQ-KIT-017..019: none). AC-KIT-017.6
+  and .18 each describe one translation with several parts; each part has its own assertion in
+  decisions.test.ts. The refusal shape is from the gateway docs; a live refusal has not been observed.
 
 UNSOURCED, and marked: the 32,000 / 64,000 token limits (relayed from TypeSafe docs, not measured);
   the characters-per-token ratio (chosen conservative, not measured against Jev's tokenizer);

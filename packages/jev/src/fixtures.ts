@@ -66,12 +66,37 @@ export function fakeClock(start = 1_000_000) {
   };
 }
 
-export function okBody(answers: Record<string, unknown>, extra: Record<string, unknown> = {}) {
+/**
+ * A 2xx `/v1/decisions` body. `answers` may be given in the caller's v0.1
+ * shape keyed by name (`{ oom: { type: "noul", noul: 0.97 } }`) — translated
+ * here to the wire's named array, malformed values passed through untouched so
+ * the client's validation still sees them — or as a raw wire array.
+ */
+export function okBody(answers: Record<string, unknown> | unknown[], extra: Record<string, unknown> = {}) {
   return {
-    model: "typesafe-ai/jev",
-    answers,
-    usage: { input_tokens: 326, output_tokens: 40 },
-    provider_metadata: { gateway: { cost: "0", marketCost: "0.0000137" } },
+    model: "typesafe-ai/jev-1.14.0",
+    answers: Array.isArray(answers) ? answers : Object.entries(answers).map(([name, a]) => toWireAnswer(name, a)),
+    usage: { input_tokens: 326, output_tokens: 40, total_tokens: 366 },
+    provider_metadata: {
+      gateway: { routing: { finalProvider: "typesafe-ai" }, cost: "0", marketCost: "0.0000137" },
+    },
     ...extra,
   };
+}
+
+function toWireAnswer(name: string, raw: unknown): unknown {
+  if (typeof raw !== "object" || raw === null) return raw;
+  const a = raw as Record<string, unknown>;
+  const { type, ...rest } = a;
+  if (type === "noul") {
+    const { noul, ...more } = rest;
+    return { type: "predicate", name, probability: noul, ...more };
+  }
+  const probs = rest.probabilities;
+  if ((type === "choice" || type === "score") && typeof probs === "object" && probs !== null && !Array.isArray(probs)) {
+    rest.probabilities = Object.entries(probs).map(([k, p]) =>
+      type === "score" ? { value: Number(k), label: `level ${k}`, probability: p } : { value: k, probability: p },
+    );
+  }
+  return { type, name, ...rest };
 }

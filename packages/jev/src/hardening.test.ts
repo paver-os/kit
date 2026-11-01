@@ -76,9 +76,10 @@ test("wire: an extra field on a question is not sent, so the email in it never l
   const sent = JSON.stringify(calls[0]!.body);
   assert.ok(!sent.includes("jane.doe"), sent);
   assert.deepEqual(calls[0]!.body, {
-    model: "typesafe-ai/jev",
-    state: STATE,
-    questions: { oom: { type: "noul", instructions: "Did it run out of memory?" } },
+    model: "typesafe-ai/jev-1.14.0",
+    input: STATE,
+    questions: [{ type: "predicate", name: "oom", instructions: "Did it run out of memory?" }],
+    providerOptions: { gateway: { zeroDataRetention: true } },
   });
 });
 

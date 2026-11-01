@@ -23,27 +23,29 @@ function client(script: Scripted[], cfg: Partial<JevClientConfig> = {}) {
   return { c, calls: f.calls, clock };
 }
 
-// AC-KIT-013.1, .11, .12, .23, .24, .25, .27 — success path
-test("success: posts to the systemone endpoint with the jev model and reports usage and cost", async () => {
+// AC-KIT-013.1, .11, .12, .23, .24, .25, .27, AC-KIT-017.1, .2, .3, .17 — success path
+test("success: posts to /v1/decisions with the versioned jev model, requires ZDR, reports usage, cost and provider", async () => {
   const { c, calls } = client([{ status: 200, body: okBody({ oom: { type: "noul", noul: 0.97 } }) }]);
   const r = await c.ask(STATE, QS);
   assert.equal(r.ok, true);
   if (!r.ok) return;
-  assert.equal(r.answers.oom.noul, 0.97);
+  assert.deepEqual(r.answers.oom, { type: "noul", noul: 0.97 });
   assert.equal(r.attempts, 1);
-  assert.deepEqual(r.usage, { inputTokens: 326, outputTokens: 40, cost: 0, marketCost: 0.0000137 });
+  assert.deepEqual(r.usage, { inputTokens: 326, outputTokens: 40, cost: 0, marketCost: 0.0000137, provider: "typesafe-ai" });
   assert.equal(typeof r.elapsedMs, "number");
   assert.equal(calls.length, 1);
   assert.equal(calls[0]!.url, JEV_ENDPOINT);
-  assert.equal(JEV_ENDPOINT, "https://ai-gateway.vercel.sh/typesafe/v1/systemone");
+  assert.equal(JEV_ENDPOINT, "https://ai-gateway.vercel.sh/v1/decisions");
   assert.equal(calls[0]!.method, "POST");
   assert.equal(calls[0]!.headers["authorization"], `Bearer ${TEST_KEY}`);
   assert.equal(calls[0]!.headers["content-type"], "application/json");
-  const body = calls[0]!.body as { model: string; state: string; questions: unknown };
-  assert.equal(body.model, JEV_MODEL);
-  assert.equal(JEV_MODEL, "typesafe-ai/jev");
-  assert.equal(body.state, STATE);
-  assert.deepEqual(body.questions, QS);
+  assert.equal(JEV_MODEL, "typesafe-ai/jev-1.14.0");
+  assert.deepEqual(calls[0]!.body, {
+    model: JEV_MODEL,
+    input: STATE,
+    questions: [{ type: "predicate", name: "oom", instructions: "Did the step fail because it ran out of memory?" }],
+    providerOptions: { gateway: { zeroDataRetention: true } },
+  });
 });
 
 // AC-KIT-013.26 — a missing cost is undefined, never zero

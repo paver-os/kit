@@ -7,8 +7,11 @@
  * AC-KIT-013.4  — `answers` is unreachable without testing `ok`.
  * AC-KIT-016.12 — each answer is typed by the question asked under its key.
  * AC-KIT-016.13 — a choice answer is the union of that question's option keys.
+ * AC-KIT-017.19 — a refused answer is in every answer's union, so a caller
+ *                 cannot read a value without first ruling the refusal out.
+ * AC-KIT-017.5  — `no_zdr_provider` is in the closed failure set.
  */
-import { choice, noul, score, type JevClient } from "./index.ts";
+import { choice, decide, decideChoice, isRefused, noul, score, type JevClient } from "./index.ts";
 
 declare const client: JevClient;
 
@@ -23,19 +26,34 @@ export async function typeChecks(): Promise<void> {
   void r.answers;
 
   if (r.ok) {
-    const p: number = r.answers.upset.noul;
-    const a: "build" | "test" = r.answers.area.choice;
+    const { upset, area, sev } = r.answers;
+    // @ts-expect-error — AC-KIT-017.19: the value is unreachable until the refusal is ruled out
+    void upset.noul;
+    // The decision helpers take the answer as-is, refusal included.
+    const d1: "yes" | "no" | "unsure" = decide(upset, { yesAtOrAbove: 0.8, noAtOrBelow: 0.2 });
+    const d2: "build" | "test" | "unsure" = decideChoice(area, { minConfidence: 0.6 });
+    if (isRefused(upset) || isRefused(area) || isRefused(sev)) return;
+    const p: number = upset.noul;
+    const a: "build" | "test" = area.choice;
     // @ts-expect-error — AC-KIT-016.13: "deploy" was not an option
-    const bad: "deploy" = r.answers.area.choice;
-    const s: number = r.answers.sev.score;
+    const bad: "deploy" = area.choice;
+    const s: number = sev.score;
     // @ts-expect-error — AC-KIT-016.12: a noul answer carries no `choice`
-    void r.answers.upset.choice;
+    void upset.choice;
     // @ts-expect-error — AC-KIT-016.12: no answer exists under an un-asked key
     void r.answers.missing;
-    void p, a, bad, s;
+    void p, a, bad, s, d1, d2;
   } else {
-    const kind: "personal_data" | "state_too_large" | "invalid_request" | "missing_key" | "auth" | "rejected" | "exhausted" | "bad_response" =
-      r.failure.kind;
+    const kind:
+      | "personal_data"
+      | "state_too_large"
+      | "invalid_request"
+      | "missing_key"
+      | "auth"
+      | "rejected"
+      | "no_zdr_provider"
+      | "exhausted"
+      | "bad_response" = r.failure.kind;
     void kind;
   }
 }

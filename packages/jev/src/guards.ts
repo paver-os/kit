@@ -11,7 +11,8 @@
  * costs a policy breach. Every pattern is bounded in length or hand-scanned,
  * so the whole scan is linear in its input (AC-KIT-015.19).
  */
-import type { JevQuestion, PersonalDataKind } from "./types.ts";
+import type { PersonalDataKind } from "./types.ts";
+import type { PreparedImage, WireQuestion } from "./wire.ts";
 
 // NANP: the area code starts 2-9, which keeps a Unix timestamp (starts with 1)
 // and an ISO date (4-2-2 grouping) out. The exchange may start with any digit
@@ -89,29 +90,6 @@ function luhnValid(digits: string): boolean {
 
 // ── What is sent ─────────────────────────────────────────────────────────────
 
-/**
- * The questions exactly as they go on the wire: `type`, `instructions`,
- * `criteria`, nothing else (AC-KIT-015.20). An extra field a caller attached
- * is dropped here, so it can neither carry data out nor escape the scan.
- * Callers must pass questions that already passed `questionProblem`.
- */
-export function wireQuestions(questions: Record<string, JevQuestion>): Record<string, JevQuestion> {
-  const out: Record<string, JevQuestion> = {};
-  for (const [key, q] of Object.entries(questions)) {
-    if (q.type === "noul") {
-      out[key] =
-        q.criteria === undefined
-          ? { type: "noul", instructions: q.instructions }
-          : { type: "noul", instructions: q.instructions, criteria: { true: q.criteria.true, false: q.criteria.false } };
-    } else if (q.type === "choice") {
-      out[key] = { type: "choice", instructions: q.instructions, criteria: { ...q.criteria } };
-    } else {
-      out[key] = { type: "score", instructions: q.instructions, criteria: [...q.criteria] };
-    }
-  }
-  return out;
-}
-
 /** Every string in a value — object keys included, recursively. Scanning this scans the whole body (AC-KIT-015.1). */
 export function sentStrings(value: unknown, into: string[] = []): string[] {
   if (typeof value === "string") into.push(value);
@@ -140,15 +118,36 @@ export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 3);
 }
 
+/**
+ * Estimated input tokens per image (AC-KIT-017.11). `low` is anchored on the
+ * one measurement in hand — a 512 px JPEG at detail low read 1,063 input
+ * tokens with a short text part (2026-10-31) — rounded up to 1,100. `high`
+ * and `auto` are NOT measured; they are set 4× higher so the estimate errs
+ * toward refusing, the same direction as the chars ÷ 3 text estimate.
+ */
+export const IMAGE_TOKEN_ESTIMATE = { low: 1_100, high: 4_400, auto: 4_400 } as const;
+
+export function estimateImageTokens(images: readonly Pick<PreparedImage, "detail">[]): number {
+  return images.reduce((sum, img) => sum + IMAGE_TOKEN_ESTIMATE[img.detail], 0);
+}
+
 export interface SizeVerdict {
   estimatedTokens: number;
   limit: number;
 }
 
-/** Returns the first limit exceeded, or null. Each question is measured as its serialized wire JSON plus its key. */
-export function sizeProblem(state: string, questions: Record<string, JevQuestion>): SizeVerdict | null {
-  const stateTokens = estimateTokens(state);
-  const qTokens = Object.entries(questions).map(([k, q]) => estimateTokens(k) + estimateTokens(JSON.stringify(q)));
+/**
+ * Returns the first limit exceeded, or null. Each question is measured as its
+ * serialized wire JSON (its name included). Images count as part of the state:
+ * every question is asked against the whole input.
+ */
+export function sizeProblem(
+  state: string,
+  questions: readonly WireQuestion[],
+  images: readonly Pick<PreparedImage, "detail">[] = [],
+): SizeVerdict | null {
+  const stateTokens = estimateTokens(state) + estimateImageTokens(images);
+  const qTokens = questions.map((q) => estimateTokens(JSON.stringify(q)));
   const longest = stateTokens + Math.max(0, ...qTokens);
   if (longest > STATE_PLUS_LONGEST_QUESTION_LIMIT) {
     return { estimatedTokens: longest, limit: STATE_PLUS_LONGEST_QUESTION_LIMIT };

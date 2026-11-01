@@ -6,8 +6,13 @@
  * resolves to a `JevResult`, and the `ok` discriminant makes the caller's type
  * checker demand a fallback branch. The gateway returned 429/503 on most calls
  * during the 2026-09-25 launch load, so a failure here is ordinary.
+ *
+ * Since v0.2.0 (@REQ-KIT-017) every call goes to the OpenAI-compatible
+ * `/v1/decisions` endpoint with a versioned, image-capable Jev and REQUIRES
+ * zero data retention; the wire translation lives in #DecisionsWire (wire.ts).
  */
-import { detectPersonalData, sentStrings, sizeProblem, wireQuestions } from "./guards.ts";
+import { detectPersonalData, sentStrings, sizeProblem } from "./guards.ts";
+import { asRecord, NO_ZDR_ERROR_TYPE, prepareImages, readAnswer, wireBody, wireQuestions, type WireQuestion } from "./wire.ts";
 import { questionProblem } from "./questions.ts";
 import type {
   AskOptions,
@@ -24,9 +29,12 @@ import type {
   RetryableOutcome,
 } from "./types.ts";
 
-/** Verified live 2026-09-25. `/v1/responses` rejects this model with 400. */
-export const JEV_ENDPOINT = "https://ai-gateway.vercel.sh/typesafe/v1/systemone";
-export const JEV_MODEL = "typesafe-ai/jev";
+/**
+ * Verified live 2026-10-31. The versioned model accepts images and lists
+ * `zdr: all`; plain `typesafe-ai/jev` lists `zdr: some` and is text-only.
+ */
+export const JEV_ENDPOINT = "https://ai-gateway.vercel.sh/v1/decisions";
+export const JEV_MODEL = "typesafe-ai/jev-1.14.0";
 export const JEV_KEY_ENV = "AI_GATEWAY_API_KEY";
 
 const RETRY_DEFAULTS = {
@@ -53,6 +61,7 @@ export function createJevClient(config: JevClientConfig = {}): JevClient {
   const now = config.now ?? Date.now;
   const sleep = config.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const random = config.random ?? Math.random;
+  const model = config.model ?? JEV_MODEL;
 
   /** Full jitter under a doubling ceiling, floored by Retry-After (AC-KIT-014.7, .9, .10). */
   const backoff = (retryNumber: number, retryAfter: number | undefined): number => {
@@ -110,7 +119,11 @@ export function createJevClient(config: JevClientConfig = {}): JevClient {
     fail: (f: JevFailure) => JevResult<Qs>,
   ): Promise<JevResult<Qs>> {
     // ── Refusals: nothing is sent unless all pass. Order is shape → size → scan. ──
-    if (typeof state !== "string" || state.trim() === "") {
+    const prepared = prepareImages(options?.images);
+    if ("problem" in prepared) return fail({ kind: "invalid_request", message: prepared.problem, sent: false });
+    const images = prepared.images;
+    // A call about images alone may carry an empty state (AC-KIT-017.6).
+    if (typeof state !== "string" || (state.trim() === "" && images.length === 0)) {
       return fail({ kind: "invalid_request", message: "state is empty", sent: false });
     }
     if (typeof questions !== "object" || questions === null || Array.isArray(questions)) {
@@ -128,7 +141,7 @@ export function createJevClient(config: JevClientConfig = {}): JevClient {
 
     // AC-KIT-015.18: size first. It is O(1) per string, so a 1M-char state is
     // refused before the scan reads a character of it.
-    const oversize = sizeProblem(state, wire);
+    const oversize = sizeProblem(state, wire, images);
     if (oversize) {
       return fail({
         kind: "state_too_large",
@@ -137,6 +150,9 @@ export function createJevClient(config: JevClientConfig = {}): JevClient {
         ...oversize,
       });
     }
+    // Images are NOT scanned — a pattern net cannot read pixels, and base64
+    // would trip it at random. They are allowed only because every call
+    // requires zero data retention (AC-KIT-017.3, .13).
     if (options?.allowPersonalData !== true) {
       const detected = new Set<PersonalDataKind>();
       for (const s of [state, ...sentStrings(wire)]) for (const k of detectPersonalData(s)) detected.add(k);
@@ -153,7 +169,7 @@ export function createJevClient(config: JevClientConfig = {}): JevClient {
 
     // ── Attempts (@REQ-KIT-014) ──
     const fetchFn: FetchLike = config.fetch ?? ((input, init) => globalThis.fetch(input, init));
-    const body = JSON.stringify({ model: JEV_MODEL, state, questions: wire });
+    const body = JSON.stringify(wireBody(model, state, wire, images));
     const deadline = call.startedAt + policy.totalBudgetMs;
     let last: { outcome: RetryableOutcome; status?: number; message: string } = {
       outcome: "timeout",
@@ -209,10 +225,18 @@ export function createJevClient(config: JevClientConfig = {}): JevClient {
         clearTimeout(timer);
       }
 
-      if (res.ok) return read(text, wire, call, fail);
+      if (res.ok) return read(text, questions, call, fail);
 
       const outcome = retryableOutcome(res.status);
       if (outcome === null) {
+        if (res.status === 400 && upstreamType(text) === NO_ZDR_ERROR_TYPE) {
+          return fail({
+            kind: "no_zdr_provider",
+            status: 400,
+            message: `no provider for ${model} satisfies zero data retention: ${upstreamMessage(text)}`,
+            sent: true,
+          });
+        }
         const kind = res.status === 401 || res.status === 403 ? "auth" : "rejected";
         return fail({ kind, status: res.status, message: `HTTP ${res.status}: ${upstreamMessage(text)}`, sent: true });
       }
@@ -231,7 +255,7 @@ export function createJevClient(config: JevClientConfig = {}): JevClient {
 
   function read<Qs extends JevQuestions>(
     text: string,
-    wire: Record<string, JevQuestion>,
+    questions: Qs,
     call: { startedAt: number; attempts: number },
     fail: (f: JevFailure) => JevResult<Qs>,
   ): JevResult<Qs> {
@@ -242,15 +266,22 @@ export function createJevClient(config: JevClientConfig = {}): JevClient {
       return fail({ kind: "bad_response", message: "2xx body is not JSON", sent: true });
     }
     const root = asRecord(parsed);
-    const answers = asRecord(root?.answers);
-    if (!root || !answers) return fail({ kind: "bad_response", message: "2xx body has no answers", sent: true });
-    for (const [name, q] of Object.entries(wire)) {
-      const problem = answerProblem(q, answers[name]);
-      if (problem) return fail({ kind: "bad_response", message: `answer "${name}": ${problem}`, sent: true });
+    if (!root || !Array.isArray(root.answers)) return fail({ kind: "bad_response", message: "2xx body has no answers", sent: true });
+    // Answers are matched by NAME, never by position (AC-KIT-017.15).
+    const byName = new Map<string, Record<string, unknown>>();
+    for (const a of root.answers) {
+      const rec = asRecord(a);
+      if (rec && typeof rec.name === "string" && !byName.has(rec.name)) byName.set(rec.name, rec);
+    }
+    const answers: Record<string, unknown> = {};
+    for (const [name, q] of Object.entries(questions)) {
+      const got = readAnswer(q, byName.get(name) ?? null);
+      if ("problem" in got) return fail({ kind: "bad_response", message: `answer "${name}": ${got.problem}`, sent: true });
+      answers[name] = got.answer;
     }
     return {
       ok: true,
-      answers: answers as unknown as JevAnswers<Qs>,
+      answers: answers as JevAnswers<Qs>,
       usage: readUsage(root),
       attempts: call.attempts,
       elapsedMs: now() - call.startedAt,
@@ -287,45 +318,6 @@ function retryAfterMs(header: string | null, nowMs: number): number | undefined 
   return Number.isNaN(at) ? undefined : Math.max(0, at - nowMs);
 }
 
-/**
- * Validates one answer against the question asked under its key
- * (AC-KIT-013.9, .10, AC-KIT-016.14, .15, .25, .26). The static type
- * `JevAnswers<Qs>` is only as true as this check, so every field the answer
- * type promises is checked here — not just the headline value.
- */
-function answerProblem(q: JevQuestion, raw: unknown): string | null {
-  const a = asRecord(raw);
-  if (!a) return "missing";
-  if (a.type !== q.type) return `type ${String(a.type)} does not match question type ${q.type}`;
-  switch (q.type) {
-    case "noul":
-      return isProbability(a.noul) ? null : "noul is not a probability in 0..1";
-    case "choice": {
-      if (typeof a.choice !== "string" || !Object.hasOwn(q.criteria, a.choice)) return "choice is not an offered option";
-      if (!isProbability(a.confidence)) return "confidence is not in 0..1";
-      return probabilitiesProblem(a.probabilities, new Set(Object.keys(q.criteria)));
-    }
-    case "score": {
-      const top = q.criteria.length - 1;
-      if (typeof a.score !== "number" || !Number.isFinite(a.score)) return "score is not a number";
-      if (a.score < 0 || a.score > top) return `score is outside 0..${top}`;
-      if (!isProbability(a.confidence)) return "confidence is not in 0..1";
-      return probabilitiesProblem(a.probabilities, new Set(q.criteria.map((_, i) => String(i))));
-    }
-  }
-}
-
-/** A probabilities map must exist, name only known options or levels, and hold values in 0..1. */
-function probabilitiesProblem(raw: unknown, allowed: Set<string>): string | null {
-  const p = asRecord(raw);
-  if (!p) return "probabilities are missing";
-  for (const [k, v] of Object.entries(p)) {
-    if (!allowed.has(k)) return `probability for unknown option "${k}"`;
-    if (!isProbability(v)) return `probability for "${k}" is not in 0..1`;
-  }
-  return null;
-}
-
 function readUsage(root: Record<string, unknown>): JevUsage {
   const usage = asRecord(root.usage);
   const gateway = asRecord(asRecord(root.provider_metadata)?.gateway);
@@ -338,6 +330,8 @@ function readUsage(root: Record<string, unknown>): JevUsage {
   const marketCost = decimal(gateway?.marketCost);
   if (cost !== undefined) out.cost = cost;
   if (marketCost !== undefined) out.marketCost = marketCost;
+  const provider = asRecord(gateway?.routing)?.finalProvider;
+  if (typeof provider === "string" && provider !== "") out.provider = provider;
   return out;
 }
 
@@ -352,14 +346,6 @@ function numberOr(v: unknown, fallback: number): number {
   return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }
 
-function isProbability(v: unknown): boolean {
-  return typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1;
-}
-
-function asRecord(v: unknown): Record<string, unknown> | null {
-  return typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
-}
-
 function upstreamMessage(text: string): string {
   let msg = text;
   try {
@@ -369,6 +355,15 @@ function upstreamMessage(text: string): string {
     // not JSON — keep the raw text
   }
   return msg || "(empty body)";
+}
+
+function upstreamType(text: string): string | undefined {
+  try {
+    const t = asRecord(asRecord(JSON.parse(text))?.error)?.type;
+    return typeof t === "string" ? t : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function errorText(err: unknown): string {
