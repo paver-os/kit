@@ -237,6 +237,14 @@ export function createJevClient(config: JevClientConfig = {}): JevClient {
             sent: true,
           });
         }
+        if (res.status === 400 && /media type/i.test(upstreamMessage(text)) && /not supported/i.test(upstreamMessage(text))) {
+          return fail({
+            kind: "invalid_request",
+            status: 400,
+            message: `image media type not supported — Jev accepts only JPEG and PNG; convert first (gateway: ${upstreamMessage(text)})`,
+            sent: true,
+          });
+        }
         if (res.status === 400 && upstreamMessage(text).includes("Invalid image dimensions")) {
           return fail({
             kind: "invalid_request",

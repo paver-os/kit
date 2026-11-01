@@ -128,7 +128,8 @@ export type JevResult<Qs extends JevQuestions> =
 
 // ── Images (@REQ-KIT-017) ────────────────────────────────────────────────────
 
-export type JevImageMediaType = "image/jpeg" | "image/png" | "image/webp" | "image/gif";
+/** JPEG and PNG only: Jev 1.14.0 answers 400 "media type ... not supported" for WebP and GIF (measured 2026-11-01). */
+export type JevImageMediaType = "image/jpeg" | "image/png";
 export type JevImageDetail = "low" | "high" | "auto";
 
 export interface JevImage {

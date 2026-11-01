@@ -69,7 +69,7 @@ export function wireQuestions(questions: Record<string, JevQuestion>): WireQuest
 
 export const MAX_IMAGES = 128;
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-export const IMAGE_MEDIA_TYPES: readonly JevImageMediaType[] = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+export const IMAGE_MEDIA_TYPES: readonly JevImageMediaType[] = ["image/jpeg", "image/png"];
 export const IMAGE_DETAILS: readonly JevImageDetail[] = ["low", "high", "auto"];
 
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
@@ -92,7 +92,7 @@ export function prepareImages(images: unknown): { problem: string } | { images: 
     const img = raw as Partial<JevImage> | null;
     if (typeof img !== "object" || img === null) return { problem: `image ${i} is not an object` };
     if (!IMAGE_MEDIA_TYPES.includes(img.mediaType as JevImageMediaType)) {
-      return { problem: `image ${i}: mediaType must be one of ${IMAGE_MEDIA_TYPES.join(", ")}` };
+      return { problem: `image ${i}: mediaType ${String(img.mediaType)} is not supported — Jev accepts only ${IMAGE_MEDIA_TYPES.join(", ")}; convert the image to JPEG or PNG first` };
     }
     const detail = img.detail ?? "low";
     if (!IMAGE_DETAILS.includes(detail)) return { problem: `image ${i}: detail must be one of ${IMAGE_DETAILS.join(", ")}` };

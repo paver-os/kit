@@ -8,7 +8,7 @@ Guarded client for TypeSafe AI's **Jev** through Vercel AI Gateway. Jev writes n
 - **Runtime:** Node 20+ (built v0.2.0 verified on 20.19.2 and 22.23.1, live text + image calls, 2026-10-31), or any runtime with global `fetch`. Tests and the smoke script need Node 22 (`--experimental-strip-types`). Zero runtime dependencies.
 
 ```json
-"@paver/jev": "github:paver-os/kit#jev-v0.2.1"
+"@paver/jev": "github:paver-os/kit#jev-v0.2.2"
 ```
 
 ## Rules the package enforces
@@ -23,7 +23,7 @@ Guarded client for TypeSafe AI's **Jev** through Vercel AI Gateway. Jev writes n
 | State too big (≈ chars ÷ 3 > 32k tokens with the longest question, or > 64k total) | Refused before sending (`state_too_large`) |
 | Key | Read from `AI_GATEWAY_API_KEY` at call time; never logged, never in a result |
 | Zero data retention | **Required on every call** (`providerOptions.gateway.zeroDataRetention: true`), not configurable off. No ZDR provider on the route → `no_zdr_provider` |
-| Images | ≤ 128 per call, each ≤ 5 MB decoded, JPEG / PNG / WebP / GIF, detail `low` (default) / `high` / `auto`; otherwise `invalid_request`, unsent. Each counts ~1,100 estimated tokens at `low`, 4,400 at `high`/`auto` (unmeasured) toward the size limit |
+| Images | ≤ 128 per call, each ≤ 5 MB decoded, JPEG / PNG only (WebP / GIF refused unsent — see below), detail `low` (default) / `high` / `auto`; otherwise `invalid_request`, unsent. Each counts ~1,100 estimated tokens at `low`, 4,400 at `high`/`auto` (unmeasured) toward the size limit |
 | Refused question | Comes back as `{ type: "refusal", refused: true }` under its key; the other answers are normal; `decide` / `decideChoice` return `"unsure"` |
 
 **No customer or personal text goes to Jev.** The personal-data scan still runs over the state and question text on every call. Images cannot be scanned; they are allowed because every call enforces zero data retention. `typesafe-ai/jev-1.14.0` lists `zdr: all` (measured 2026-10-31), but lifting the personal-data guard is an operator decision not yet taken: `allowPersonalData: true` stays forbidden by policy (AC-KIT-015.11).
@@ -69,7 +69,9 @@ if (r.ok && !isRefused(r.answers.product)) console.log(r.answers.product.choice,
 
 `data` is bytes or base64 **without** a `data:` prefix; external URLs are not supported. The state may be `""` when images are attached. Resize to ~512 px before sending — detail `low` is the measured case.
 
-**Dimensions (v0.2.1).** Jev 1.14.0 answers 400 "Invalid image dimensions" when the short edge is under ~280 px or the aspect ratio exceeds ~5:1 (measured 2026-11-01). The client reads width × height from the JPEG / PNG / WebP / GIF header and refuses such an image before any call, as `invalid_request` naming the image index and size (`JEV_MIN_SHORT_EDGE = 280`, `JEV_MAX_ASPECT = 5`; `imageSize(bytes)` is exported). An image whose header cannot be parsed is sent and the gateway decides; if it then answers "Invalid image dimensions", that is also `invalid_request`, not retried. Pad or crop thin images to ≥ 280 px and ≤ 5:1 first.
+**Dimensions (v0.2.1).** Jev 1.14.0 answers 400 "Invalid image dimensions" when the short edge is under ~280 px or the aspect ratio exceeds ~5:1 (measured 2026-11-01). The client reads width × height from the JPEG / PNG header and refuses such an image before any call, as `invalid_request` naming the image index and size (`JEV_MIN_SHORT_EDGE = 280`, `JEV_MAX_ASPECT = 5`; `imageSize(bytes)` is exported). An image whose header cannot be parsed is sent and the gateway decides; if it then answers "Invalid image dimensions", that is also `invalid_request`, not retried. Pad or crop thin images to ≥ 280 px and ≤ 5:1 first.
+
+**JPEG / PNG only (v0.2.2).** Measured 2026-11-01 against `POST /v1/decisions`, `typesafe-ai/jev-1.14.0`: `image/jpeg` and `image/png` answer; `image/webp` and `image/gif` answer 400 "'TypeSafe AI decision image media type: …' functionality not supported." (`AI_UnsupportedFunctionalityError`). `JevImage.mediaType` is now `"image/jpeg" | "image/png"`, and any other type is refused before any call as `invalid_request` (`sent` false) telling you to convert to JPEG or PNG; a gateway 400 naming an unsupported media type is also `invalid_request`, not retried. **Type-narrowing change, intended:** a TypeScript caller passing `"image/webp"` or `"image/gif"` now fails typecheck — convert first. `imageSize` no longer parses WebP / GIF headers (returns null for them).
 
 **Cost per image** (measured 2026-10-31, $0.000000042 per input token): a 512 px JPEG at `low` with three short questions read 1,117–1,120 input tokens, **$0.000047 per call**; a text-only call of two questions read 374 tokens, $0.000016.
 

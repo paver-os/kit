@@ -259,11 +259,17 @@ After this FRD ships: a product adds one pinned dependency, builds its questions
 
 *Image dimensions (v0.2.1, measured 2026-11-01)*
 
-- **AC-KIT-017.20:** The package shall read an image's width and height from its header bytes, without a dependency, for JPEG (start-of-frame marker), PNG (IHDR), WebP (VP8, VP8L, VP8X) and GIF (logical screen).
+- **AC-KIT-017.20:** The package shall read an image's width and height from its header bytes, without a dependency, for JPEG (start-of-frame marker) and PNG (IHDR). (Revised v0.2.2: WebP / GIF parsing removed — those types are refused by AC-KIT-017.25 before the header is read.)
 - **AC-KIT-017.21:** When an image's short edge is under 280 px, or its long edge divided by its short edge exceeds 5, the call shall resolve to an `invalid_request` failure with `sent` false whose message names the image's index and its width×height, and no request shall be made.
 - **AC-KIT-017.22:** When an image's header cannot be read, the package shall send the image unrefused and leave the decision to the gateway.
 - **AC-KIT-017.23:** When the gateway answers HTTP 400 with a message containing "Invalid image dimensions", the call shall resolve to an `invalid_request` failure with `sent` true and status 400 after that one attempt, without retry.
 - **AC-KIT-017.24:** The package shall export the limits as `JEV_MIN_SHORT_EDGE = 280` and `JEV_MAX_ASPECT = 5`. Source: Jev 1.14.0 refused 7 of 9 OverlayPro crops (e.g. 35×522) and a 270 px-short-side RACK poster, and accepted 280 px (2026-11-01); the edges are measured, not documented.
+
+*Media types (v0.2.2, measured 2026-11-01)*
+
+- **AC-KIT-017.25:** When an image's `mediaType` is anything other than `image/jpeg` or `image/png`, the call shall resolve to an `invalid_request` failure with `sent` false whose message names the media type and tells the caller to convert to JPEG or PNG, and no request shall be made; `JevImageMediaType` shall be `"image/jpeg" | "image/png"`. Source: Jev 1.14.0 answered 400 `AI_UnsupportedFunctionalityError` "media type ... not supported" for image/webp and image/gif, and answered image/jpeg and image/png (p=0.98) (2026-11-01).
+- **AC-KIT-017.26:** An `image/jpeg` or `image/png` image that passes every other guard shall be sent.
+- **AC-KIT-017.27:** When the gateway answers HTTP 400 with a message containing "media type" and "not supported", the call shall resolve to an `invalid_request` failure with `sent` true and status 400 after that one attempt, without retry.
 
 ## Scope Boundary
 
@@ -323,6 +329,8 @@ REVISION 3 — REQ-KIT-017 was the next free id (grepped .paver/ for REQ-KIT-017
   decisions.test.ts. The refusal shape is from the gateway docs; a live refusal has not been observed.
 
 REVISION 4 — AC-KIT-017.20–.24 added for v0.2.1 (WO-KIT-005): the pre-send dimension guard.
+
+REVISION 5 — AC-KIT-017.25–.27 added and .20 narrowed for v0.2.2 (WO-KIT-006): JPEG / PNG only.
 
 UNSOURCED, and marked: the 32,000 / 64,000 token limits (relayed from TypeSafe docs, not measured);
   the characters-per-token ratio (chosen conservative, not measured against Jev's tokenizer);

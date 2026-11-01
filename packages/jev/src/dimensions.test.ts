@@ -9,8 +9,6 @@ import type { JevImage, JevImageMediaType } from "./index.ts";
 import { scriptedFetch, fakeClock, okBody, TEST_KEY, type Scripted } from "./fixtures.ts";
 
 const be16 = (v: number) => [(v >> 8) & 0xff, v & 0xff];
-const le16 = (v: number) => [v & 0xff, (v >> 8) & 0xff];
-const le24 = (v: number) => [v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff];
 const be32 = (v: number) => [(v >>> 24) & 0xff, (v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff];
 const asc = (s: string) => [...s].map((c) => c.charCodeAt(0));
 
@@ -21,15 +19,6 @@ function jpeg(w: number, h: number, sof = 0xc0): Uint8Array {
 }
 const png = (w: number, h: number) =>
   new Uint8Array([0x89, ...asc("PNG"), 0x0d, 0x0a, 0x1a, 0x0a, ...be32(13), ...asc("IHDR"), ...be32(w), ...be32(h), 8, 6, 0, 0, 0]);
-const gif = (w: number, h: number) => new Uint8Array([...asc("GIF89a"), ...le16(w), ...le16(h), 0, 0, 0]);
-const riff = (chunk: number[]) => new Uint8Array([...asc("RIFF"), ...le24(chunk.length + 4), 0, ...asc("WEBP"), ...chunk]);
-const vp8 = (w: number, h: number) => riff([...asc("VP8 "), 0, 0, 0, 0, 0, 0, 0, 0x9d, 0x01, 0x2a, ...le16(w), ...le16(h), 0, 0]);
-function vp8l(w: number, h: number) {
-  const bits = ((w - 1) & 0x3fff) | (((h - 1) & 0x3fff) << 14);
-  return riff([...asc("VP8L"), 0, 0, 0, 0, 0x2f, bits & 0xff, (bits >> 8) & 0xff, (bits >> 16) & 0xff, (bits >>> 24) & 0xff, 0, 0, 0, 0, 0]);
-}
-const vp8x = (w: number, h: number) => riff([...asc("VP8X"), 10, 0, 0, 0, 0, 0, 0, 0, ...le24(w - 1), ...le24(h - 1), 0, 0]);
-
 const QS = { product: noul("Is a product visible?") };
 const OK = okBody({ product: { type: "noul", noul: 0.9 } });
 function client(script: Scripted[] = [{ status: 200, body: OK }]) {
@@ -41,14 +30,10 @@ function client(script: Scripted[] = [{ status: 200, body: OK }]) {
 const img = (data: Uint8Array | string, mediaType: JevImageMediaType = "image/jpeg"): JevImage => ({ data, mediaType });
 
 // AC-KIT-017.20 — every format's header is read
-test("dimensions: reads width and height from JPEG, PNG, GIF and WebP (VP8, VP8L, VP8X) headers", () => {
+test("dimensions: reads width and height from JPEG and PNG headers", () => {
   assert.deepEqual(imageSize(jpeg(640, 480)), { width: 640, height: 480 });
   assert.deepEqual(imageSize(jpeg(300, 900, 0xc2)), { width: 300, height: 900 });
   assert.deepEqual(imageSize(png(1024, 512)), { width: 1024, height: 512 });
-  assert.deepEqual(imageSize(gif(35, 522)), { width: 35, height: 522 });
-  assert.deepEqual(imageSize(vp8(800, 600)), { width: 800, height: 600 });
-  assert.deepEqual(imageSize(vp8l(1000, 281)), { width: 1000, height: 281 });
-  assert.deepEqual(imageSize(vp8x(4000, 3000)), { width: 4000, height: 3000 });
 });
 
 // AC-KIT-017.24
@@ -59,7 +44,7 @@ test("dimensions: the limits are exported as 280 px and 5:1", () => {
 
 // AC-KIT-017.21 — short edge boundary, every format
 test("dimensions: a 279 px short edge is refused unsent, naming the image and its size; 280 px is sent", async () => {
-  const makers = [[jpeg, "image/jpeg"], [png, "image/png"], [gif, "image/gif"], [vp8, "image/webp"], [vp8l, "image/webp"], [vp8x, "image/webp"]] as const;
+  const makers = [[jpeg, "image/jpeg"], [png, "image/png"]] as const;
   for (const [make, type] of makers) {
     const bad = client();
     const r = await bad.c.ask("", QS, { images: [img(make(600, 280), type), img(make(600, 279), type)] });
@@ -111,7 +96,7 @@ test("dimensions: an image whose header cannot be read is sent, not refused", as
   for (const data of [new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), new Uint8Array([1, 2, 3, 4, 5]), asc("RIFF\0\0\0\0WEBPJUNK").concat(Array(20).fill(0))]) {
     assert.equal(imageSize(data instanceof Uint8Array ? data : new Uint8Array(data)), null);
     const t = client();
-    const r = await t.c.ask("", QS, { images: [img(data instanceof Uint8Array ? data : new Uint8Array(data), "image/webp")] });
+    const r = await t.c.ask("", QS, { images: [img(data instanceof Uint8Array ? data : new Uint8Array(data), "image/png")] });
     assert.equal(r.ok, true);
     assert.equal(t.calls.length, 1);
   }

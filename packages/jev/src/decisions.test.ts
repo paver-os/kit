@@ -48,7 +48,7 @@ test("images: base64 strings pass through in order with their own detail and med
   await c.ask(STATE, QS, {
     images: [
       { data: "iVBORw0KGgo=", mediaType: "image/png", detail: "high" },
-      { data: "UklGRg==", mediaType: "image/webp", detail: "auto" },
+      { data: "/9j/4A==", mediaType: "image/jpeg", detail: "auto" },
     ],
   });
   const content = (body(calls).input as { content: { image_url?: string; detail?: string }[] }[])[0]!.content;
@@ -56,7 +56,7 @@ test("images: base64 strings pass through in order with their own detail and med
     content.slice(1).map((p) => [p.image_url, p.detail]),
     [
       ["data:image/png;base64,iVBORw0KGgo=", "high"],
-      ["data:image/webp;base64,UklGRg==", "auto"],
+      ["data:image/jpeg;base64,/9j/4A==", "auto"],
     ],
   );
 });
