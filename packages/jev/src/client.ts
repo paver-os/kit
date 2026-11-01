@@ -12,7 +12,7 @@
  * zero data retention; the wire translation lives in #DecisionsWire (wire.ts).
  */
 import { detectPersonalData, JEV_MAX_ASPECT, JEV_MIN_SHORT_EDGE, sentStrings, sizeProblem } from "./guards.ts";
-import { asRecord, NO_ZDR_ERROR_TYPE, prepareImages, readAnswer, wireBody, wireQuestions, type WireQuestion } from "./wire.ts";
+import { asRecord, NO_ZDR_ERROR_TYPE, prepareImages, readAnswer, wireBody, wireQuestions } from "./wire.ts";
 import { questionProblem } from "./questions.ts";
 import type {
   AskOptions,
