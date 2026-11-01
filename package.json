@@ -1,0 +1,20 @@
+{
+  "name": "@paver/jev",
+  "version": "0.2.2",
+  "description": "Guarded client for TypeSafe AI's Jev via Vercel AI Gateway: typed questions about text and images, zero data retention on every call, never-throw typed failures, bounded retry, personal-data and size refusals, yes/no/unsure decisions.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}
