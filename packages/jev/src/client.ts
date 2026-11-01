@@ -11,7 +11,7 @@
  * `/v1/decisions` endpoint with a versioned, image-capable Jev and REQUIRES
  * zero data retention; the wire translation lives in #DecisionsWire (wire.ts).
  */
-import { detectPersonalData, sentStrings, sizeProblem } from "./guards.ts";
+import { detectPersonalData, JEV_MAX_ASPECT, JEV_MIN_SHORT_EDGE, sentStrings, sizeProblem } from "./guards.ts";
 import { asRecord, NO_ZDR_ERROR_TYPE, prepareImages, readAnswer, wireBody, wireQuestions, type WireQuestion } from "./wire.ts";
 import { questionProblem } from "./questions.ts";
 import type {
@@ -234,6 +234,14 @@ export function createJevClient(config: JevClientConfig = {}): JevClient {
             kind: "no_zdr_provider",
             status: 400,
             message: `no provider for ${model} satisfies zero data retention: ${upstreamMessage(text)}`,
+            sent: true,
+          });
+        }
+        if (res.status === 400 && upstreamMessage(text).includes("Invalid image dimensions")) {
+          return fail({
+            kind: "invalid_request",
+            status: 400,
+            message: `Invalid image dimensions — Jev needs a short edge of at least ${JEV_MIN_SHORT_EDGE} px and an aspect ratio of at most ${JEV_MAX_ASPECT}:1 (gateway: ${upstreamMessage(text)})`,
             sent: true,
           });
         }

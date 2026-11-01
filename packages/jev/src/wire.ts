@@ -14,6 +14,7 @@
  * deliberately no parameter that turns it off.
  */
 import type { JevImage, JevImageDetail, JevImageMediaType, JevQuestion } from "./types.ts";
+import { imageDimensionProblem, imageSize } from "./guards.ts";
 
 // ── Wire shapes ──────────────────────────────────────────────────────────────
 
@@ -111,9 +112,19 @@ export function prepareImages(images: unknown): { problem: string } | { images: 
       return { problem: `image ${i}: data must be a Uint8Array or a base64 string` };
     }
     if (bytes === 0) return { problem: `image ${i} is empty` };
+    const header = img.data instanceof Uint8Array ? img.data : base64ToBytes(base64);
+    const dims = imageDimensionProblem(i, imageSize(header));
+    if (dims) return { problem: dims };
     out.push({ base64, bytes, mediaType: img.mediaType as JevImageMediaType, detail });
   }
   return { images: out };
+}
+
+function base64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);
+  return out;
 }
 
 /** Base64 without Node's Buffer (ADR-005: no Node-only APIs). Chunked so a 5 MB image never overflows the call stack. */

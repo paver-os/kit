@@ -8,7 +8,7 @@ Guarded client for TypeSafe AI's **Jev** through Vercel AI Gateway. Jev writes n
 - **Runtime:** Node 20+ (built v0.2.0 verified on 20.19.2 and 22.23.1, live text + image calls, 2026-10-31), or any runtime with global `fetch`. Tests and the smoke script need Node 22 (`--experimental-strip-types`). Zero runtime dependencies.
 
 ```json
-"@paver/jev": "github:paver-os/kit#jev-v0.2.0"
+"@paver/jev": "github:paver-os/kit#jev-v0.2.1"
 ```
 
 ## Rules the package enforces
@@ -69,6 +69,8 @@ if (r.ok && !isRefused(r.answers.product)) console.log(r.answers.product.choice,
 
 `data` is bytes or base64 **without** a `data:` prefix; external URLs are not supported. The state may be `""` when images are attached. Resize to ~512 px before sending — detail `low` is the measured case.
 
+**Dimensions (v0.2.1).** Jev 1.14.0 answers 400 "Invalid image dimensions" when the short edge is under ~280 px or the aspect ratio exceeds ~5:1 (measured 2026-11-01). The client reads width × height from the JPEG / PNG / WebP / GIF header and refuses such an image before any call, as `invalid_request` naming the image index and size (`JEV_MIN_SHORT_EDGE = 280`, `JEV_MAX_ASPECT = 5`; `imageSize(bytes)` is exported). An image whose header cannot be parsed is sent and the gateway decides; if it then answers "Invalid image dimensions", that is also `invalid_request`, not retried. Pad or crop thin images to ≥ 280 px and ≤ 5:1 first.
+
 **Cost per image** (measured 2026-10-31, $0.000000042 per input token): a 512 px JPEG at `low` with three short questions read 1,117–1,120 input tokens, **$0.000047 per call**; a text-only call of two questions read 374 tokens, $0.000016.
 
 ## API
@@ -85,6 +87,7 @@ if (r.ok && !isRefused(r.answers.product)) console.log(r.answers.product.choice,
 | `isRefused` | `(answer) => answer is RefusedAnswer` |
 | `JEV_MODEL` · `JEV_ENDPOINT` | `"typesafe-ai/jev-1.14.0"` · `"https://ai-gateway.vercel.sh/v1/decisions"` |
 | `MAX_IMAGES` · `MAX_IMAGE_BYTES` · `IMAGE_TOKEN_ESTIMATE` · `estimateImageTokens` | image limits and the size estimate |
+| `JEV_MIN_SHORT_EDGE` · `JEV_MAX_ASPECT` · `imageSize` · `imageDimensionProblem` | image dimension guard (v0.2.1) |
 | `detectPersonalData` | `(text: string) => ("email" \| "phone" \| "ssn" \| "card")[]` |
 | `estimateTokens` | `(text: string) => number` |
 

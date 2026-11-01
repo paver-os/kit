@@ -257,6 +257,14 @@ After this FRD ships: a product adds one pinned dependency, builds its questions
 - **AC-KIT-017.18:** The package shall send a noul question as `predicate` with its true and false criteria appended to its instructions, a choice question as `choice` with `choices: [{ value, description }]`, and a score question as `score` with `levels: [{ label }]`, as an array named by the caller's keys; and it shall return answers in the shapes of REQ-KIT-016 (a choice's probabilities keyed by option, a score's keyed by level index).
 - **AC-KIT-017.19:** Each answer's type shall be a union with the refused answer, so that a TypeScript caller cannot read an answer's value without first ruling the refusal out.
 
+*Image dimensions (v0.2.1, measured 2026-11-01)*
+
+- **AC-KIT-017.20:** The package shall read an image's width and height from its header bytes, without a dependency, for JPEG (start-of-frame marker), PNG (IHDR), WebP (VP8, VP8L, VP8X) and GIF (logical screen).
+- **AC-KIT-017.21:** When an image's short edge is under 280 px, or its long edge divided by its short edge exceeds 5, the call shall resolve to an `invalid_request` failure with `sent` false whose message names the image's index and its width×height, and no request shall be made.
+- **AC-KIT-017.22:** When an image's header cannot be read, the package shall send the image unrefused and leave the decision to the gateway.
+- **AC-KIT-017.23:** When the gateway answers HTTP 400 with a message containing "Invalid image dimensions", the call shall resolve to an `invalid_request` failure with `sent` true and status 400 after that one attempt, without retry.
+- **AC-KIT-017.24:** The package shall export the limits as `JEV_MIN_SHORT_EDGE = 280` and `JEV_MAX_ASPECT = 5`. Source: Jev 1.14.0 refused 7 of 9 OverlayPro crops (e.g. 35×522) and a 270 px-short-side RACK poster, and accepted 280 px (2026-11-01); the edges are measured, not documented.
+
 ## Scope Boundary
 
 **In scope:** one client for Jev's System One endpoint through Vercel AI Gateway; the typed failure contract; retry, backoff and budget; the personal-data and size refusals; typed question builders and answers; the yes / no / unsure decision helpers; usage and cost reporting per call; one opt-in live smoke script.
@@ -313,6 +321,8 @@ REVISION 2 — AC-KIT-016.25 and .26 each list several conditions joined by "or"
 REVISION 3 — REQ-KIT-017 was the next free id (grepped .paver/ for REQ-KIT-017..019: none). AC-KIT-017.6
   and .18 each describe one translation with several parts; each part has its own assertion in
   decisions.test.ts. The refusal shape is from the gateway docs; a live refusal has not been observed.
+
+REVISION 4 — AC-KIT-017.20–.24 added for v0.2.1 (WO-KIT-005): the pre-send dimension guard.
 
 UNSOURCED, and marked: the 32,000 / 64,000 token limits (relayed from TypeSafe docs, not measured);
   the characters-per-token ratio (chosen conservative, not measured against Jev's tokenizer);

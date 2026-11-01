@@ -10,6 +10,8 @@
 export { createJevClient, JEV_ENDPOINT, JEV_MODEL, JEV_KEY_ENV } from "./client.ts";
 export { noul, choice, score } from "./questions.ts";
 export { detectPersonalData, estimateTokens, estimateImageTokens, IMAGE_TOKEN_ESTIMATE } from "./guards.ts";
+export { imageSize, imageDimensionProblem, JEV_MIN_SHORT_EDGE, JEV_MAX_ASPECT } from "./guards.ts";
+export type { ImageSize } from "./guards.ts";
 export { MAX_IMAGES, MAX_IMAGE_BYTES } from "./wire.ts";
 export { decide, decideChoice, isRefused } from "./decide.ts";
 export type { Decision, DecisionThresholds } from "./decide.ts";

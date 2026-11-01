@@ -156,3 +156,82 @@ export function sizeProblem(
   if (total > REQUEST_TOTAL_LIMIT) return { estimatedTokens: total, limit: REQUEST_TOTAL_LIMIT };
   return null;
 }
+
+// ── Image dimensions (AC-KIT-017.20–.24) ─────────────────────────────────────
+
+/**
+ * Jev 1.14.0 answers HTTP 400 "Invalid image dimensions" when an image's short
+ * edge is under ~280 px or its aspect ratio exceeds ~5:1 (measured 2026-11-01:
+ * 35×522 and a 270 px short side refused, 280 px accepted). Refusing first saves
+ * the call. The limits are measured edges, not documented ones.
+ */
+export const JEV_MIN_SHORT_EDGE = 280;
+export const JEV_MAX_ASPECT = 5;
+
+export interface ImageSize {
+  width: number;
+  height: number;
+}
+
+/**
+ * Width and height from the header bytes of a JPEG (any SOF marker), PNG
+ * (IHDR), WebP (VP8 / VP8L / VP8X) or GIF (logical screen). Returns null when
+ * the header cannot be read — the caller then sends the image and lets the
+ * gateway decide (AC-KIT-017.22). Pure; reads only the bytes it needs.
+ */
+export function imageSize(b: Uint8Array): ImageSize | null {
+  const n = b.length;
+  const u16be = (i: number) => (b[i]! << 8) | b[i + 1]!;
+  const u16le = (i: number) => b[i]! | (b[i + 1]! << 8);
+  const u24le = (i: number) => b[i]! | (b[i + 1]! << 8) | (b[i + 2]! << 16);
+  const ascii = (i: number, s: string) => {
+    for (let k = 0; k < s.length; k += 1) if (b[i + k] !== s.charCodeAt(k)) return false;
+    return true;
+  };
+  const ok = (width: number, height: number) => (width > 0 && height > 0 ? { width, height } : null);
+
+  // PNG: 8-byte signature, then the IHDR chunk.
+  if (n >= 24 && b[0] === 0x89 && ascii(1, "PNG") && ascii(12, "IHDR")) {
+    return ok(((b[16]! << 24) >>> 0) + (b[17]! << 16) + (b[18]! << 8) + b[19]!, ((b[20]! << 24) >>> 0) + (b[21]! << 16) + (b[22]! << 8) + b[23]!);
+  }
+  // GIF: logical screen width / height, little-endian.
+  if (n >= 10 && (ascii(0, "GIF87a") || ascii(0, "GIF89a"))) return ok(u16le(6), u16le(8));
+  // WebP: RIFF....WEBP, then the first chunk.
+  if (n >= 30 && ascii(0, "RIFF") && ascii(8, "WEBP")) {
+    if (ascii(12, "VP8 ") && b[23] === 0x9d && b[24] === 0x01 && b[25] === 0x2a) return ok(u16le(26) & 0x3fff, u16le(28) & 0x3fff);
+    if (ascii(12, "VP8L") && b[20] === 0x2f) {
+      const bits = (b[21]! | (b[22]! << 8) | (b[23]! << 16) | (b[24]! << 24)) >>> 0;
+      return ok((bits & 0x3fff) + 1, ((bits >>> 14) & 0x3fff) + 1);
+    }
+    if (ascii(12, "VP8X")) return ok(u24le(24) + 1, u24le(27) + 1);
+    return null;
+  }
+  // JPEG: walk the marker segments to the first start-of-frame.
+  if (n >= 4 && b[0] === 0xff && b[1] === 0xd8) {
+    let i = 2;
+    while (i + 3 < n) {
+      if (b[i] !== 0xff) return null;
+      const m = b[i + 1]!;
+      if (m === 0xff) { i += 1; continue; }
+      if (m === 0xd8 || m === 0x01 || (m >= 0xd0 && m <= 0xd7)) { i += 2; continue; }
+      if (m === 0xd9 || m === 0xda) return null;
+      const len = u16be(i + 2);
+      if (len < 2) return null;
+      const isSof = m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc;
+      if (isSof) return i + 8 < n ? ok(u16be(i + 7), u16be(i + 5)) : null;
+      i += 2 + len;
+    }
+  }
+  return null;
+}
+
+/** The refusal reason for image `index`, or null when its size is accepted (or unknown). */
+export function imageDimensionProblem(index: number, size: ImageSize | null): string | null {
+  if (size === null) return null;
+  const short = Math.min(size.width, size.height);
+  const long = Math.max(size.width, size.height);
+  if (short < JEV_MIN_SHORT_EDGE || long / short > JEV_MAX_ASPECT) {
+    return `image ${index} is ${size.width}×${size.height}: Invalid image dimensions — Jev needs a short edge of at least ${JEV_MIN_SHORT_EDGE} px and an aspect ratio of at most ${JEV_MAX_ASPECT}:1`;
+  }
+  return null;
+}
