@@ -314,6 +314,9 @@ test("answers: choice and score answers are returned per key; an unoffered optio
   const r = await good.c.ask(STATE, qs);
   assert.equal(r.ok, true);
   if (!r.ok) return;
+  assert.equal(r.answers.area.type, "choice");
+  assert.equal(r.answers.severity.type, "score");
+  if (r.answers.area.type !== "choice" || r.answers.severity.type !== "score") return;
   const area: "build" | "test" | "deploy" = r.answers.area.choice;
   assert.equal(area, "build");
   assert.equal(r.answers.severity.score, 1.8);
